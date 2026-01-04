@@ -1,0 +1,189 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body {
+  overflow: auto;
+  height: auto;
+  min-height: 100vh;
+}
+
+:root {
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-base);
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: var(--color-text-override, var(--color-text));
+  background-color: var(--color-background);
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+
+  /* Theme CSS Variables */
+  --color-primary: #3B82F6;
+  --color-primary-light: #60A5FA;
+  --color-primary-dark: #2563EB;
+  --color-secondary: #6366F1;
+  --color-accent: #8B5CF6;
+  --color-background: #F0F9FF;
+  --color-surface: #FFFFFF;
+  --color-text: #1F2937;
+  --color-text-secondary: #6B7280;
+  --color-text-override: var(--color-text);
+  --color-text-sidebar-override: var(--color-text);
+  --color-text-header-override: var(--color-text);
+  --app-bg-color: #F8FAFC;
+  --app-bg-image: none;
+  --card-opacity: 85%;
+
+  /* Typography */
+  --font-size-base: 16px;
+  --font-family-base: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  min-width: 320px;
+  min-height: 100vh;
+  background-color: var(--color-background);
+  color: var(--color-text-override, var(--color-text));
+  overflow: auto;
+}
+
+#root {
+  width: 100%;
+  height: auto;
+  min-height: 100vh;
+  overflow: auto;
+  background-color: var(--app-bg-color);
+  background-image: var(--app-bg-image);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Theme helper classes */
+.theme-bg {
+  background-color: var(--color-background);
+}
+
+.theme-surface {
+  background-color: var(--color-surface);
+}
+
+.theme-app-bg {
+  background-color: var(--app-bg-color);
+  background-image: var(--app-bg-image);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+/* 반투명 배경 (배경 이미지가 비쳐보이게) */
+.theme-app-bg-translucent {
+  background-color: color-mix(in srgb, var(--app-bg-color) 75%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* 카드용 반투명 배경 */
+.theme-surface-translucent {
+  background-color: color-mix(in srgb, var(--color-surface) var(--card-opacity), transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.theme-text {
+  color: var(--color-text-override, var(--color-text));
+}
+
+.theme-text-sidebar {
+  color: var(--color-text-sidebar-override, var(--color-text-override, var(--color-text)));
+}
+
+.theme-text-header {
+  color: var(--color-text-header-override, var(--color-text-override, var(--color-text)));
+}
+
+.theme-text-secondary {
+  color: var(--color-text-secondary);
+}
+
+.theme-primary-bg {
+  background-color: var(--color-primary);
+}
+
+.theme-primary-text {
+  color: var(--color-primary);
+}
+
+.theme-secondary-text {
+  color: var(--color-secondary);
+}
+
+.theme-accent-text {
+  color: var(--color-accent);
+}
+
+.theme-border {
+  border-color: var(--color-primary);
+}
+
+.theme-header-bg {
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 55%, var(--color-accent) 100%);
+}
+
+.theme-sidebar-bg {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--color-primary-light) 70%, white 30%) 0%, color-mix(in srgb, var(--color-primary) 55%, white 45%) 55%, color-mix(in srgb, var(--color-secondary) 55%, white 45%) 100%);
+}
+
+/* Custom scrollbar styles */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(193, 193, 193, 0.5);
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(168, 168, 168, 0.8);
+  opacity: 1;
+}
+
+/* Show scrollbar on scroll */
+*:hover::-webkit-scrollbar,
+*::-webkit-scrollbar:active {
+  opacity: 1;
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(193, 193, 193, 0.5) transparent;
+}
+

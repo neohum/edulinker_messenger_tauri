@@ -1,0 +1,41 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 배경 그라디언트 -->
+  <rect width="512" height="512" rx="102.4" fill="url(#gradient)"/>
+
+  <!-- 내부 그림자 효과 -->
+  <rect x="25.6" y="25.6" width="460.8" height="460.8" rx="92.16" fill="url(#innerShadow)" opacity="0.2"/>
+
+  <!-- E 문자 배경 (깊이감) -->
+  <text x="256" y="350.72" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="281.6" font-weight="900" fill="#000000" text-anchor="middle" opacity="0.15">E</text>
+
+  <!-- E 문자 메인 -->
+  <text x="256" y="345.6" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="281.6" font-weight="900" fill="white" text-anchor="middle" letter-spacing="-7.68">E</text>
+
+  <!-- 상단 하이라이트 (광택 효과) -->
+  <ellipse cx="256" cy="128" rx="179.2" ry="76.8" fill="url(#highlight)" opacity="0.3"/>
+
+  <!-- 작은 하이라이트 점 -->
+  <circle cx="368.64" cy="143.36" r="30.72" fill="white" opacity="0.5"/>
+
+  <defs>
+    <!-- 메인 그라디언트 (더 부드러운 전환) -->
+    <linearGradient id="gradient" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2979FF"/>
+      <stop offset="40%" stop-color="#1E88E5"/>
+      <stop offset="70%" stop-color="#42A5F5"/>
+      <stop offset="100%" stop-color="#C6FF00"/>
+    </linearGradient>
+
+    <!-- 내부 그림자 -->
+    <linearGradient id="innerShadow" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#000000"/>
+      <stop offset="100%" stop-color="#FFFFFF"/>
+    </linearGradient>
+
+    <!-- 하이라이트 그라디언트 -->
+    <linearGradient id="highlight" x1="0" y1="0" x2="0" y2="256" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+</svg>

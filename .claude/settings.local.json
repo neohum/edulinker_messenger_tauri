@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:github.com)",
+      "Bash(cat:*)",
+      "Bash(pnpm add:*)",
+      "Bash(dir /s \"E:\\works\\project\\edulinker_messenger_tauri\\src-tauri\\src\")",
+      "Bash(cargo check:*)",
+      "Bash(dir:*)",
+      "Bash(wc:*)",
+      "Bash(find:*)",
+      "Bash(copy icon.png icon.ico)",
+      "Bash(python3:*)",
+      "Bash(pnpm install:*)",
+      "Bash(pnpm dev:*)",
+      "Bash(copy \"E:\\works\\project\\edulinker_messenger_tauri\\public\\icon-256.png\" \"E:\\works\\project\\edulinker_messenger_tauri\\src-tauri\\icons\\128x128@2x.png\")",
+      "Bash(copy \"E:\\works\\project\\edulinker_messenger_tauri\\public\\icon-32.png\" \"E:\\works\\project\\edulinker_messenger_tauri\\src-tauri\\icons\\32x32.png\")",
+      "Bash(copy \"E:\\works\\project\\edulinker_messenger_tauri\\public\\icon-512.png\" \"E:\\works\\project\\edulinker_messenger_tauri\\src-tauri\\icons\\icon.png\")",
+      "Bash(pip install:*)",
+      "Bash(python -c:*)",
+      "Bash(pnpm tauri dev:*)",
+      "Bash(taskkill:*)",
+      "Bash(timeout 90 bash:*)",
+      "Bash(pnpm dev:web:*)",
+      "Bash(npx tsc:*)",
+      "Bash(curl:*)",
+      "WebSearch"
+    ]
+  }
+}
