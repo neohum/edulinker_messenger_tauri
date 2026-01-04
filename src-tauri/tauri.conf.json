@@ -43,7 +43,7 @@
       "endpoints": [
         "https://s3.ap-northeast-1.wasabisys.com/edulinkermessenger/updates/latest.json"
       ],
-      "pubkey": ""
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDlBOTAzREY0MEE4REU0NjEKUldSaDVJMEs5RDJRbWlFb09GempMNElmSE4vU3h3bVZWcGtWTXl2MENYNUpvNGxvS1VIKzFRTW4K"
     }
   }
 }
