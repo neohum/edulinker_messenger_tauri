@@ -80,20 +80,3 @@ export interface GroupMessage extends FormattedMessage {
   deliveredTo: string[]; // 전달된 사용자 ID 목록
 }
 
-// 자동 응답 메시지
-export const AUTO_REPLIES = [
-  '네, 확인했습니다.',
-  '알겠습니다. 감사합니다!',
-  '좋은 아이디어네요.',
-  '잠시 후 연락드릴게요.',
-  '회의 끝나고 다시 연락드리겠습니다.',
-  '네, 그렇게 하겠습니다.',
-  '확인하고 답변드릴게요.',
-  '좋습니다. 진행해 주세요.',
-  '시간 되시면 잠깐 통화 가능할까요?',
-  '고맙습니다. 확인했어요.'
-] as const;
-
-export function getRandomAutoReply(): string {
-  return AUTO_REPLIES[Math.floor(Math.random() * AUTO_REPLIES.length)];
-}

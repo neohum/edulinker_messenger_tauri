@@ -25,7 +25,9 @@
       "Bash(npx tsc:*)",
       "Bash(curl:*)",
       "WebSearch",
-      "Bash(pnpm tauri signer generate:*)"
+      "Bash(pnpm tauri signer generate:*)",
+      "Bash(findstr:*)",
+      "Bash(ls:*)"
     ]
   }
 }

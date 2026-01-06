@@ -2,8 +2,6 @@
 const electronAPI = window.electronAPI;
 
 import { getAppConfig, isLocalMode, checkServerConnection } from './appConfig';
-import { getTeachers } from './dataService';
-import type { FakeTeacher } from './fakeDataGenerator';
 
 export interface AddressBookEntry {
   id?: number;
@@ -31,33 +29,6 @@ export interface AddressBookEntry {
   phoneNumber?: string;
 }
 
-// FakeTeacher를 AddressBookEntry로 변환
-function teacherToAddressBookEntry(teacher: FakeTeacher): AddressBookEntry {
-  return {
-    userId: teacher.id,
-    name: teacher.name,
-    email: teacher.email,
-    phone: teacher.phoneNumber,
-    role: teacher.role,
-    schoolId: 'local-school',
-    ipAddress: '192.168.1.' + Math.floor(Math.random() * 254 + 1),
-    hostname: `${teacher.name}-PC`,
-    os: 'Windows 11',
-    platform: 'win32',
-    lastSeen: teacher.lastSeen,
-    isOnline: teacher.isOnline,
-    synced: false,
-    createdAt: teacher.createdAt,
-    updatedAt: teacher.lastSeen,
-    grade: teacher.grade,
-    class: teacher.class,
-    workplace: teacher.workplace,
-    jobTitle: teacher.jobTitle,
-    extensionNumber: teacher.extensionNumber,
-    phoneNumber: teacher.phoneNumber
-  };
-}
-
 export interface AddressBookStats {
   totalDevices: number;
   onlineDevices: number;
@@ -79,16 +50,6 @@ export class AddressBookService {
   async initialize(): Promise<void> {
     if (this.initialized) return;
 
-    // 로컬 모드에서는 페이크 데이터로 초기화
-    if (isLocalMode()) {
-      const teachers = await getTeachers();
-      this.localCache = teachers.map(teacherToAddressBookEntry);
-      this.initialized = true;
-      console.log(`[AddressBook] 로컬 모드 초기화 완료: ${this.localCache.length}명`);
-      return;
-    }
-
-    // 원격/하이브리드 모드
     try {
       const result = await electronAPI.initAddressBook() as IPCResponse;
       if (!result.success) {
@@ -96,9 +57,8 @@ export class AddressBookService {
       }
       this.initialized = true;
     } catch (error) {
-      console.warn('[AddressBook] 원격 초기화 실패, 로컬 모드로 폴백:', error);
-      const teachers = await getTeachers();
-      this.localCache = teachers.map(teacherToAddressBookEntry);
+      console.warn('[AddressBook] 주소록 초기화 실패:', error);
+      this.localCache = [];
       this.initialized = true;
     }
   }
@@ -147,9 +107,19 @@ export class AddressBookService {
   async getAllEntries(): Promise<AddressBookEntry[]> {
     await this.ensureInitialized();
 
-    // 로컬 모드에서는 캐시된 페이크 데이터 반환
+    // 로컬 모드에서는 로컬 DB 조회
     if (isLocalMode()) {
-      return this.localCache;
+      try {
+        const result = await electronAPI.getAllAddressBookEntries() as IPCResponse<AddressBookEntry[]>;
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to get local address book entries');
+        }
+        this.localCache = result.data || [];
+        return this.localCache;
+      } catch (error) {
+        console.warn('[AddressBook] 로컬 조회 실패, 캐시 사용:', error);
+        return this.localCache;
+      }
     }
 
     // 하이브리드 모드에서 서버 연결 확인
@@ -167,13 +137,10 @@ export class AddressBookService {
       if (!result.success) {
         throw new Error(result.error || 'Failed to get all users for address book');
       }
-      return result.data || [];
+      this.localCache = result.data || [];
+      return this.localCache;
     } catch (error) {
       console.warn('[AddressBook] 원격 조회 실패, 로컬 캐시 사용:', error);
-      if (this.localCache.length === 0) {
-        const teachers = await getTeachers();
-        this.localCache = teachers.map(teacherToAddressBookEntry);
-      }
       return this.localCache;
     }
   }
@@ -222,8 +189,8 @@ export class AddressBookService {
 
   // 로컬 캐시 새로고침
   async refreshLocalCache(): Promise<void> {
-    const teachers = await getTeachers();
-    this.localCache = teachers.map(teacherToAddressBookEntry);
+    const entries = await this.getAllEntries();
+    this.localCache = entries;
     console.log(`[AddressBook] 로컬 캐시 새로고침: ${this.localCache.length}명`);
   }
 
@@ -449,20 +416,15 @@ export class AddressBookService {
         throw new Error('No authentication token found');
       }
 
-      // 개발 환경에서는 시드 계정 API 사용
-      const isDevelopment = process.env.NODE_ENV === 'development';
-      const endpoint = isDevelopment ? '/api/dev/seed-accounts?all=true' : '/api/address-book';
-
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       };
 
-      // 시드 계정 API는 인증이 필요 없을 수 있음
-      if (!isDevelopment && token) {
+      if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      const response = await fetch(`${apiUrl}${endpoint}`, {
+      const response = await fetch(`${apiUrl}/api/address-book`, {
         method: 'GET',
         headers,
       });
@@ -475,51 +437,31 @@ export class AddressBookService {
 
       let entriesArray: any[] = [];
 
-      if (isDevelopment && data.success && data.accounts) {
-        // 시드 계정 API 응답 처리
-        entriesArray = data.accounts.map((account: any) => ({
-          userId: account.user.id,
-          name: account.user.name || account.user.username || `User ${account.user.id}`,
-          email: account.user.email || '',
-          phone: account.user.phone || '',
-          role: account.user.role || 'UNKNOWN',
-          schoolId: account.user.schoolId,
-          ipAddress: '', // 시드 데이터에는 IP 정보 없음
-          hostname: '',
-          os: '',
-          platform: '',
-          lastSeen: new Date().toISOString(),
-          isOnline: false, // 시드 데이터는 오프라인으로 표시
-          synced: false
-        }));
-      } else {
-        // 프로덕션 API 응답 처리
-        const addressBookData = data.addressBook || [];
-        entriesArray = Array.isArray(addressBookData)
-          ? addressBookData
-          : Object.values(addressBookData || {}).flat();
+      const addressBookData = data.addressBook || [];
+      entriesArray = Array.isArray(addressBookData)
+        ? addressBookData
+        : Object.values(addressBookData || {}).flat();
 
-        // 로컬 데이터베이스가 필요로 하는 필드 형태로 변환
-        entriesArray = entriesArray.map((entry: any) => {
-          const deviceInfo = entry.currentDevice || entry.devices?.[0] || {};
+      // 로컬 데이터베이스가 필요로 하는 필드 형태로 변환
+      entriesArray = entriesArray.map((entry: any) => {
+        const deviceInfo = entry.currentDevice || entry.devices?.[0] || {};
 
-          return {
-            userId: entry.userId || entry.id,
-            name: entry.name || '',
-            email: entry.email || '',
-            phone: entry.phone || entry.mobile,
-            role: entry.role || 'UNKNOWN',
-            schoolId: entry.schoolId,
-            ipAddress: deviceInfo.ipAddress || entry.ipAddress || '',
-            hostname: deviceInfo.hostname || entry.hostname || '',
-            os: deviceInfo.os || entry.os || '',
-            platform: deviceInfo.platform || entry.platform || '',
-            lastSeen: deviceInfo.lastSeen || entry.lastLoginAt || entry.updatedAt || new Date().toISOString(),
-            isOnline: Boolean(deviceInfo.isOnline ?? entry.isOnline),
-            synced: true
-          };
-        });
-      }
+        return {
+          userId: entry.userId || entry.id,
+          name: entry.name || '',
+          email: entry.email || '',
+          phone: entry.phone || entry.mobile,
+          role: entry.role || 'UNKNOWN',
+          schoolId: entry.schoolId,
+          ipAddress: deviceInfo.ipAddress || entry.ipAddress || '',
+          hostname: deviceInfo.hostname || entry.hostname || '',
+          os: deviceInfo.os || entry.os || '',
+          platform: deviceInfo.platform || entry.platform || '',
+          lastSeen: deviceInfo.lastSeen || entry.lastLoginAt || entry.updatedAt || new Date().toISOString(),
+          isOnline: Boolean(deviceInfo.isOnline ?? entry.isOnline),
+          synced: true
+        };
+      });
 
       return entriesArray;
     } catch (error) {

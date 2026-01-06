@@ -9,6 +9,7 @@ export interface User {
   role: string;
   schoolId?: string;
   profileCompleted?: boolean;
+  organizationGroup?: string;
   grade?: number;
   class?: string;
   classroom?: string;

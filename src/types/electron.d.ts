@@ -13,18 +13,12 @@ export interface ElectronAPI {
   updateUserProfileOffline: (profileData: any) => Promise<any>;
   checkNetworkStatus: () => Promise<any>;
   checkInternalNetworkIp: () => Promise<any>;
-  seedDemoData: () => Promise<any>;
-  seedFromJsonFile: (filePath: string) => Promise<any>;
-
   // Offline Auth
   offlineLogin: (credentials: any) => Promise<any>;
   offlineRegister: (data: any) => Promise<any>;
   validateOfflineSession: (token: string) => Promise<any>;
   syncUsers: (onlineUsers: any[]) => Promise<any>;
   getOfflineUsers: () => Promise<any>;
-  seedTeacherData: (count: number) => Promise<any>;
-  seedFakeUsers: (options: any) => Promise<any>;
-
   // Window controls
   minimizeWindow: () => Promise<void>;
   maximizeWindow: () => Promise<void>;

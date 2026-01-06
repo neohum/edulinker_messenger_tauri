@@ -11,7 +11,9 @@
     "dev:web": "vite",
     "build:web": "vite build",
     "preview": "vite preview",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test:instance": "cargo run --manifest-path=src-tauri/Cargo.toml",
+    "test:p2p": "echo 'Terminal 1: pnpm dev:web' && echo 'Terminal 2: pnpm dev' && echo 'Terminal 3: pnpm test:instance'"
   },
   "dependencies": {
     "@durable-streams/client": "^0.1.2",

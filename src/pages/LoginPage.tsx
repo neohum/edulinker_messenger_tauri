@@ -9,8 +9,6 @@ export default function LoginPage({ onSwitchToSignup }: LoginPageProps) {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
-  const [availableUsers, setAvailableUsers] = useState<Record<string, any[]>>({});
-  const [selectedUser, setSelectedUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [isOnline, setIsOnline] = useState(true);
@@ -25,34 +23,6 @@ export default function LoginPage({ onSwitchToSignup }: LoginPageProps) {
   const [forceInternalOffline, setForceInternalOffline] = useState(false);
   
   const { setAuth } = useAuthStore();
-
-  // 자동 로그인 확인
-  useEffect(() => {
-    const checkAutoLogin = async () => {
-      // TEST_AUTO_LOGIN 환경 변수 대신, 직접 autoLogin 호출
-      console.log('Attempting auto-login for teacher...');
-      try {
-        setIsLoading(true);
-        const result = await window.electronAPI.autoLogin('teacher');
-        if (result.success) {
-          console.log('Auto-login successful:', result);
-          // The auth store should be updated by the auto-login handler
-        } else {
-          console.error('Auto-login failed:', result);
-          setError('자동 로그인 실패: ' + (result.error || '알 수 없는 오류'));
-        }
-      } catch (error: any) {
-        console.error('Error during auto-login:', error);
-        setError('자동 로그인 중 오류 발생: ' + error.message);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    // 약간의 지연 후 자동 로그인 시도
-    const timer = setTimeout(checkAutoLogin, 1000);
-    return () => clearTimeout(timer);
-  }, [setAuth]);
 
   const checkDatabaseConnection = async () => {
     try {
@@ -212,232 +182,15 @@ export default function LoginPage({ onSwitchToSignup }: LoginPageProps) {
     }, 100);
   };
 
-  const handleAutoLogin = async (userType: 'teacher' | 'admin') => {
-    setError('');
-    setIsLoading(true);
+  
 
-    try {
-      console.log('Auto login attempt for:', userType);
-
-      const result = await window.electronAPI?.autoLogin?.(userType);
-
-      if (result?.success) {
-        console.log('Auto login successful:', result.user);
-
-        // 인증 상태 설정
-        setAuth(result.token, result.user);
-
-        // 로그인 성공 후 대시보드로 이동 (부모 컴포넌트에서 처리)
-        if (window.electronAPI?.showNotification) {
-          window.electronAPI.showNotification({
-            title: '자동 로그인 성공',
-            body: `${result.user.name}님으로 로그인되었습니다.`
-          });
-        }
-      } else {
-        setError(result?.error || '자동 로그인 실패');
-      }
-    } catch (error: any) {
-      console.error('Auto login error:', error);
-      setError(`자동 로그인 중 오류가 발생했습니다: ${error.message}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleUserSelectLogin = async () => {
-    if (!selectedUser) {
-      setError('사용자를 선택해주세요.');
-      return;
-    }
-
-    setError('');
-    setIsLoading(true);
-
-    try {
-      let result;
-
-      if (!isOnline) {
-        // 오프라인 모드: 로컬 SQLite DB 사용
-        console.log('Using offline authentication for user selection');
-        result = await window.electronAPI?.offlineLogin?.({
-          email: selectedUser.email,
-          password: 'password123', // 기본 비밀번호 사용
-        });
-
-        if (result?.success) {
-          // 오프라인 사용자 정보를 온라인 형식으로 변환
-          const offlineUser = result.user;
-          const onlineUser = {
-            id: offlineUser.id,
-            email: offlineUser.email,
-            name: selectedUser.name,
-            role: offlineUser.role,
-          };
-
-          setAuth(result.token, onlineUser);
-          return;
-        }
-      } else {
-        // 온라인 모드: API 서버 사용
-        console.log('Using online authentication for user selection');
-        // 연결 상태 재확인
-        const apiAvailable = await checkConnection();
-        
-        if (!apiAvailable) {
-          setError('서버에 연결할 수 없습니다. 네트워크 연결을 확인해주세요.');
-          return;
-        }
-
-        result = await window.electronAPI?.login?.({
-          identifier: selectedUser.email,
-          password: 'password123', // 기본 비밀번호 사용
-          rememberMe: true
-        });
-      }
-
-      console.log('User select login result:', result);
-
-      if (!result) {
-        setError('로그인 응답을 받지 못했습니다.');
-        return;
-      }
-
-      if (result.success && result.token && result.user) {
-        setAuth(result.token, result.user);
-      } else {
-        setError(getFriendlyErrorMessage(result.error) || '선택한 사용자로 로그인에 실패했습니다.');
-      }
-    } catch (err: any) {
-      console.error('User select login error:', err);
-      setError(getFriendlyErrorMessage(err.message) || '선택한 사용자로 로그인 중 오류가 발생했습니다.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // 개발 환경인지 확인
-  const isDevelopment = import.meta.env.DEV;
-
-  // 오프라인 모드에서 사용할 기본 사용자들
-  const getOfflineUsers = async () => {
-    try {
-      const result = await window.electronAPI?.getOfflineUsers?.();
-      if (result?.success) {
-        return result.users;
-      }
-      return [];
-    } catch (error) {
-      console.error('Failed to get offline users:', error);
-      return [];
-    }
-  };
-
-  // 오프라인 사용자 목록 가져오기 (온라인일 때는 API에서, 오프라인일 때는 로컬 DB에서)
-  const fetchAvailableUsers = async () => {
-    try {
-      if (!isOnline) {
-        // 오프라인 모드: 데모 데이터 시드 후 사용자 목록 가져오기
-        console.log('Seeding demo data for offline mode...');
-        const seedResult = await window.electronAPI?.seedDemoData?.();
-        if (seedResult?.success) {
-          console.log('Demo data seeded successfully');
-        } else {
-          console.error('Failed to seed demo data:', seedResult?.error);
-        }
-
-        // 시드된 사용자 목록 가져오기
-        const offlineUsers = await getOfflineUsers();
-        if (offlineUsers.length > 0) {
-          // 기존 사용자들을 그룹화
-          const groupedUsers: Record<string, any[]> = {};
-          
-          offlineUsers.forEach((user: any) => {
-            const role = user.role || 'USER';
-            if (!groupedUsers[role]) {
-              groupedUsers[role] = [];
-            }
-            groupedUsers[role].push({
-              id: user.id,
-              name: user.name,
-              email: user.email,
-              role: user.role,
-              schoolName: user.school,
-              grade: user.grade,
-              class: user.class,
-              classroom: user.classroom,
-              workplace: user.workplace,
-              jobTitle: user.job_title,
-              adminDuties: user.admin_duties,
-              extensionNumber: user.extension_number,
-              phoneNumber: user.phone_number,
-              profileCompleted: user.profile_completed
-            });
-          });
-
-          setAvailableUsers(groupedUsers);
-        } else {
-          // 기본 사용자들 생성 (시드가 실패한 경우)
-          const defaultUsers = [
-            { email: 'teacher@demo.com', password: 'password123', role: 'TEACHER', name: '데모 교사', school: '테스트 학교' },
-            { email: 'admin@demo.com', password: 'password123', role: 'ADMIN', name: '데모 관리자', school: '테스트 학교' },
-          ];
-
-          for (const user of defaultUsers) {
-            await window.electronAPI?.offlineRegister?.(user);
-          }
-
-          // 다시 사용자 목록 가져오기
-          const updatedUsers = await getOfflineUsers();
-          const groupedUsers: Record<string, any[]> = {};
-          
-          updatedUsers.forEach((user: any) => {
-            const role = user.role || 'USER';
-            if (!groupedUsers[role]) {
-              groupedUsers[role] = [];
-            }
-            groupedUsers[role].push({
-              id: user.id,
-              name: user.name,
-              email: user.email,
-              role: user.role,
-              schoolName: user.school,
-            });
-          });
-
-          setAvailableUsers(groupedUsers);
-        }
-      } else {
-        // 온라인 모드: API 서버에서 사용자 목록 가져오기
-        const apiAvailable = await checkConnection();
-        if (!apiAvailable) {
-          console.debug('[LoginPage] API server not available, using offline mode');
-          return;
-        }
-
-        const response = await fetch('http://localhost:3000/api/dev/users');
-        const data = await response.json();
-        if (data.success) {
-          setAvailableUsers(data.users);
-        }
-      }
-    } catch (error) {
-      // 외부 서버 연결 실패는 오프라인/내부망 모드에서 정상
-      console.debug('[LoginPage] Failed to fetch users from server:', error);
-    }
-  };
-
-  // 컴포넌트 마운트 시 연결 상태 확인 및 사용자 목록 가져오기
+  // 컴포넌트 마운트 시 연결 상태 확인
   useEffect(() => {
     // 페이지 로드 시 스크롤을 상단으로 이동
     window.scrollTo(0, 0);
 
     // 네트워크 연결 확인
     checkConnection();
-
-    if (isDevelopment) {
-      fetchAvailableUsers();
-    }
 
     // 메시징 상태 변경 감지
     const handleMessagingStatus = (_: any, status: any) => {
@@ -457,7 +210,7 @@ export default function LoginPage({ onSwitchToSignup }: LoginPageProps) {
         (window as any).removeEventListener('messaging:status', handleMessagingStatus);
       }
     };
-  }, [isDevelopment]);
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -718,101 +471,6 @@ export default function LoginPage({ onSwitchToSignup }: LoginPageProps) {
           </button>
         </form>
 
-        {/* 개발 환경에서만 표시되는 자동 로그인 */}
-        {isDevelopment && (
-          <div className="mt-6 space-y-4">
-            <div className="text-center">
-              <p className="text-xs text-gray-500 mb-3">🚀 개발자 환경 - 자동 로그인</p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => handleAutoLogin('teacher')}
-                disabled={isLoading}
-                className="py-2 px-3 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                title="교사 계정으로 자동 로그인"
-              >
-                👨‍🏫 교사
-              </button>
-              <button
-                onClick={() => handleAutoLogin('admin')}
-                disabled={isLoading}
-                className="py-2 px-3 bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                title="관리자 계정으로 자동 로그인"
-              >
-                👑 관리자
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* 개발 환경에서만 표시되는 사용자 선택 로그인 */}
-        {isDevelopment && (
-          <div className="mt-6 space-y-4">
-            <div className="text-center">
-              <p className="text-xs text-gray-500 mb-3">개발자 환경 - 사용자 선택 로그인</p>
-            </div>
-
-            {/* 사용자 선택 드롭다운 */}
-            <div>
-              <label htmlFor="userSelect" className="block text-sm font-medium text-gray-700 mb-2">
-                로그인할 사용자 선택
-              </label>
-              <select
-                id="userSelect"
-                value={selectedUser?.id || ''}
-                onChange={(e) => {
-                  const userId = e.target.value;
-                  // 모든 역할의 사용자 중에서 선택된 사용자 찾기
-                  for (const role of Object.keys(availableUsers)) {
-                    const user = availableUsers[role].find((u: any) => u.id === userId);
-                    if (user) {
-                      setSelectedUser(user);
-                      break;
-                    }
-                  }
-                }}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                disabled={isLoading}
-              >
-                <option value="">사용자를 선택하세요</option>
-                {Object.entries(availableUsers).map(([role, users]) => (
-                  <optgroup key={role} label={`${role} (${users.length}명)`}>
-                    {users.map((user: any) => (
-                      <option key={user.id} value={user.id}>
-                        {user.name} ({user.email}) - {user.schoolName || '학교 없음'}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-            </div>
-
-            {/* 선택한 사용자 정보 표시 */}
-            {selectedUser && (
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-800">
-                  <strong>선택된 사용자:</strong> {selectedUser.name} ({selectedUser.email})
-                </p>
-                {selectedUser.schoolName && (
-                  <p className="text-sm text-blue-600 mt-1">
-                    학교: {selectedUser.schoolName}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* 사용자 선택 로그인 버튼 */}
-            <button
-              onClick={handleUserSelectLogin}
-              disabled={isLoading || !selectedUser}
-              className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading ? '로그인 중...' : '선택한 사용자로 로그인'}
-            </button>
-          </div>
-        )}
-
         <div className="mt-6 text-center text-sm text-gray-500">
           <p>교사 및 학교 관리자만 접근 가능합니다</p>
           {onSwitchToSignup && (
@@ -831,4 +489,7 @@ export default function LoginPage({ onSwitchToSignup }: LoginPageProps) {
     </div>
   );
 }
+
+
+
 

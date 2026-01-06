@@ -27,7 +27,6 @@ type Tab = 'services' | 'organization' | 'files' | 'notifications' | 'network' |
 
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<Tab>('organization');
-  const [isSeeding, setIsSeeding] = useState(false);
   const headerRef = useRef<HTMLDivElement>(null);
   const { selectContact } = useMessagingStore();
   const { downloadPath } = useDownloadStore();
@@ -76,39 +75,6 @@ export default function DashboardPage() {
     setActiveTab('messaging');
   };
 
-  const handleSeedFakeUsers = async () => {
-    if (!confirm('가짜 사용자 데이터를 생성하시겠습니까? (교사, 학생, 학부모 데이터가 생성됩니다)')) {
-      return;
-    }
-
-    setIsSeeding(true);
-    try {
-      const result = await window.electronAPI?.seedFakeUsers?.({
-        teachers: 10,
-        admins: 2,
-        students: 50,
-        parents: 20
-      });
-
-      if (result?.success) {
-        alert(result.message);
-        // 주소록 탭으로 이동하여 새로고침
-        setActiveTab('address-book');
-        // 약간의 지연 후 새로고침
-        setTimeout(() => {
-          window.location.reload();
-        }, 1000);
-      } else {
-        alert('데이터 생성 실패: ' + (result?.error || '알 수 없는 오류'));
-      }
-    } catch (error) {
-      console.error('Seed fake users error:', error);
-      alert('데이터 생성 중 오류가 발생했습니다.');
-    } finally {
-      setIsSeeding(false);
-    }
-  };
-
   // 개발 환경인지 확인 (임시로 강제 활성화)
   const isDevelopment = true; // import.meta.env.DEV || import.meta.env.MODE === 'development';
   console.log('Environment check:', {
@@ -130,32 +96,52 @@ export default function DashboardPage() {
 
   const openMessageCenterWindow = async () => {
     try {
-      const existing = await WebviewWindow.getByLabel('message-center');
-      if (existing) {
-        await existing.setFocus();
-        return;
+      console.log('[DashboardPage] 메시지함 창 열기 시도...');
+
+      // 이미 열려있는 창이 있는지 확인
+      try {
+        const existing = await WebviewWindow.getByLabel('message-center');
+        if (existing) {
+          console.log('[DashboardPage] 기존 메시지함 창 포커스');
+          await existing.setFocus();
+          return;
+        }
+      } catch (e) {
+        console.log('[DashboardPage] 기존 창 없음, 새 창 생성');
       }
-    } catch (e) {
-      // 창이 없으면 에러 발생, 무시하고 새 창 생성
+
+      // 현재 페이지 URL을 기반으로 메시지 센터 URL 생성
+      const baseUrl = window.location.origin;
+      const messageCenterUrl = `${baseUrl}/#/message-center`;
+
+      console.log('[DashboardPage] 메시지 센터 URL:', messageCenterUrl);
+
+      const windowInstance = new WebviewWindow('message-center', {
+        url: messageCenterUrl,
+        title: '메시지함',
+        width: 1100,
+        height: 780,
+        resizable: true,
+        decorations: false,
+        center: true,
+      });
+
+      windowInstance.once('tauri://error', (error) => {
+        console.error('[DashboardPage] 메시지함 창 생성 실패:', error);
+        alert(`메시지함 창을 열 수 없습니다: ${error}`);
+      });
+
+      windowInstance.once('tauri://created', () => {
+        console.log('[DashboardPage] 메시지함 창 생성 성공');
+      });
+
+      windowInstance.once('tauri://window-created', () => {
+        console.log('[DashboardPage] 메시지함 창 표시됨');
+      });
+    } catch (error) {
+      console.error('[DashboardPage] 메시지함 창 열기 중 오류:', error);
+      alert(`메시지함을 열 수 없습니다: ${error}`);
     }
-
-    // 현재 페이지 URL을 기반으로 메시지 센터 URL 생성
-    const baseUrl = window.location.origin;
-    const messageCenterUrl = `${baseUrl}/#/message-center`;
-
-    const windowInstance = new WebviewWindow('message-center', {
-      url: messageCenterUrl,
-      title: '메시지함',
-      width: 1100,
-      height: 780,
-      resizable: true,
-      decorations: false,
-      center: true,
-    });
-
-    windowInstance.once('tauri://error', (error) => {
-      console.error('메시지함 창 생성 실패:', error);
-    });
   };
 
   const openDownloadFolder = async () => {

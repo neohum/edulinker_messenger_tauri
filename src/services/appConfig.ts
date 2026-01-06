@@ -12,11 +12,6 @@ export interface AppConfig {
   appMode: AppMode;
   isDevMode: boolean;
 
-  // 페이크 데이터
-  autoSeedData: boolean;
-  fakeTeachersCount: number;
-  fakeAdminsCount: number;
-
   // 네트워크
   discoveryPort: number;
   p2pPort: number;
@@ -42,11 +37,6 @@ function loadConfig(): AppConfig {
     // 운영 모드
     appMode: (import.meta.env.VITE_APP_MODE as AppMode) || 'local',
     isDevMode: import.meta.env.VITE_DEV_MODE === 'true' || import.meta.env.DEV,
-
-    // 페이크 데이터
-    autoSeedData: import.meta.env.VITE_AUTO_SEED_DATA === 'true',
-    fakeTeachersCount: parseInt(import.meta.env.VITE_FAKE_TEACHERS_COUNT || '50'),
-    fakeAdminsCount: parseInt(import.meta.env.VITE_FAKE_ADMINS_COUNT || '5'),
 
     // 네트워크
     discoveryPort: parseInt(import.meta.env.VITE_DISCOVERY_PORT || '41234'),

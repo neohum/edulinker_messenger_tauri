@@ -28,6 +28,13 @@ interface MessageItem {
   attachments?: FileAttachment[];
 }
 
+interface ContactOption {
+  id: string;
+  name: string;
+  role: string;
+  email: string;
+}
+
 const PAGE_SIZE = 10;
 
 const tabLabels: Record<MessageTab, string> = {
@@ -43,108 +50,6 @@ const tabBadgeClasses: Record<MessageTab, string> = {
   'scheduled-received': 'bg-purple-50 text-purple-700',
   'scheduled-sent': 'bg-orange-50 text-orange-700',
 };
-
-const sampleSenders = [
-  '김철수 (교무부장)',
-  '이영희 (학생지원부)',
-  '박민수 (행정실장)',
-  '정수진 (학부모회장)',
-  '최동현 (2학년 담임)',
-  '한지민 (교육청)',
-  '오세훈 (보건교사)',
-  '윤서연 (상담교사)',
-  '강민호 (방과후담당)',
-  '임수빈 (1학년 담임)',
-  '조현우 (3학년 담임)',
-  '송미래 (영어과)',
-];
-
-const sampleRecipients = [
-  '전체 교직원',
-  '1학년 담임교사',
-  '2학년 담임교사',
-  '3학년 담임교사',
-  '전담교사',
-  '행정실',
-  '교무실',
-  '보건교사',
-  '상담교사',
-  '학년부장',
-  '교과부장',
-  '특수교육담당',
-];
-
-const sampleTitles = [
-  '주간 업무 안내드립니다',
-  '긴급 공지사항',
-  '수업 시간표 변경 안내',
-  '학교 행사 일정 공유',
-  '회의 자료 전달',
-  '교육청 공문 회람',
-  '방학 운영 계획',
-  '현장체험학습 안내',
-  '수업 평가 일정 안내',
-  '학교 안전 점검 협조',
-  '학부모 상담 일정',
-  '교직원 연수 안내',
-  '급식 메뉴 안내',
-  '방역 점검 협조',
-  '졸업식 준비 안내',
-];
-
-const sampleContents = [
-  '안녕하세요. 이번 주 주요 일정과 담당 업무를 공유드립니다. 자세한 내용은 첨부파일을 확인해주세요.',
-  '급한 일정 변경이 있어 안내드립니다. 확인 부탁드립니다. 문의사항은 교무실로 연락 바랍니다.',
-  '내일 수업 시간표가 변경되었습니다. 자세한 내용은 첨부 확인 바랍니다.',
-  '행사 준비 관련하여 필요한 준비물을 공유합니다. 기한 내 준비 부탁드립니다.',
-  '회의 자료를 전달드립니다. 회의 전에 미리 검토해주시기 바랍니다.',
-  '교육청 공문 안내드립니다. 확인 후 필요시 회신 부탁드립니다.',
-  '방학 일정과 운영 계획을 공유드립니다. 참고하시기 바랍니다.',
-  '현장체험학습 관련 공지사항을 확인해주세요. 인솔 담당 선생님께서는 꼭 확인 바랍니다.',
-  '수업 평가 관련 서류 제출 일정 안내드립니다. 마감일을 꼭 지켜주세요.',
-  '학교 안전 점검 일정 안내 및 협조 부탁드립니다. 각 교실 점검 부탁합니다.',
-  '학부모 상담 주간 일정입니다. 상담 시간 조율이 필요하시면 연락주세요.',
-  '교직원 연수 일정 안내입니다. 필수 연수이오니 참석 부탁드립니다.',
-];
-
-const sampleAttachments: FileAttachment[][] = [
-  [
-    { id: 'att-1', uploadId: 'upload-1', fileName: '주간업무일지.xlsx', fileSize: 245760, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
-    { id: 'att-2', uploadId: 'upload-2', fileName: '일정표.pdf', fileSize: 1048576, mimeType: 'application/pdf' },
-  ],
-  [],
-  [
-    { id: 'att-3', uploadId: 'upload-3', fileName: '수업시간표_변경.docx', fileSize: 524288, mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
-  ],
-  [
-    { id: 'att-4', uploadId: 'upload-4', fileName: '행사준비물목록.pdf', fileSize: 2097152, mimeType: 'application/pdf' },
-    { id: 'att-5', uploadId: 'upload-5', fileName: '예산안.xlsx', fileSize: 153600, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
-    { id: 'att-6', uploadId: 'upload-6', fileName: '장소배치도.png', fileSize: 3145728, mimeType: 'image/png' },
-  ],
-  [
-    { id: 'att-7', uploadId: 'upload-7', fileName: '회의자료.pptx', fileSize: 5242880, mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' },
-  ],
-  // 폴더 첨부 테스트 (1개 폴더만 있어도 전체 다운로드 버튼 표시)
-  [
-    { id: 'att-folder-1', uploadId: 'upload-folder-1', fileName: '학급자료/', fileSize: 0, mimeType: 'application/x-directory' },
-  ],
-  [],
-  [
-    { id: 'att-8', uploadId: 'upload-8', fileName: '현장체험학습계획서.pdf', fileSize: 1572864, mimeType: 'application/pdf' },
-    { id: 'att-9', uploadId: 'upload-9', fileName: '동의서양식.hwp', fileSize: 102400, mimeType: 'application/x-hwp' },
-  ],
-  [],
-  [
-    { id: 'att-10', uploadId: 'upload-10', fileName: '안전점검체크리스트.xlsx', fileSize: 81920, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
-  ],
-  // 구글 드라이브 폴더 테스트
-  [
-    { id: 'att-folder-2', uploadId: 'upload-folder-2', fileName: '공유문서폴더', fileSize: 0, mimeType: 'application/vnd.google-apps.folder' },
-  ],
-  [
-    { id: 'att-11', uploadId: 'upload-11', fileName: '연수일정표.pdf', fileSize: 409600, mimeType: 'application/pdf' },
-  ],
-];
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -187,65 +92,6 @@ function isFolderAttachment(attachment: FileAttachment): boolean {
   );
 }
 
-function createFakeMessages(total: number): MessageItem[] {
-  const items: MessageItem[] = [];
-  const tabs: MessageTab[] = ['received', 'sent', 'scheduled-received', 'scheduled-sent'];
-
-  for (let i = 0; i < total; i += 1) {
-    // 탭 분배: 받은 메시지 40%, 보낸 메시지 30%, 예약받은 15%, 예약보낸 15%
-    let tab: MessageTab;
-    const roll = i % 20;
-    if (roll < 8) {
-      tab = 'received';
-    } else if (roll < 14) {
-      tab = 'sent';
-    } else if (roll < 17) {
-      tab = 'scheduled-received';
-    } else {
-      tab = 'scheduled-sent';
-    }
-
-    const sender = sampleSenders[i % sampleSenders.length];
-    const recipient = sampleRecipients[(i + 3) % sampleRecipients.length];
-    const daysAgo = Math.floor(i / 3);
-    const hoursAgo = (i % 24);
-    const createdAt = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000 - hoursAgo * 60 * 60 * 1000).toISOString();
-
-    const scheduledAt = tab.includes('scheduled')
-      ? new Date(Date.now() + (i + 1) * 1000 * 60 * 60 * 2).toISOString()
-      : undefined;
-
-    // 일부 메시지에 첨부 파일 추가
-    const attachmentIndex = i % sampleContents.length;
-    const attachments = sampleAttachments[attachmentIndex] || [];
-
-    items.push({
-      id: `msg-${i + 1}`,
-      tab,
-      title: sampleTitles[i % sampleTitles.length],
-      content: sampleContents[i % sampleContents.length],
-      sender,
-      recipient,
-      createdAt,
-      scheduledAt,
-      isRead: i % 3 !== 0, // 1/3은 읽지 않음
-      attachments: attachments.length > 0 ? attachments : undefined,
-    });
-  }
-  return items;
-}
-
-// 샘플 연락처 (실제로는 주소록에서 가져옴)
-const sampleContacts = [
-  { id: 'user-1', name: '김철수', role: '교무부장', email: 'kim@school.kr' },
-  { id: 'user-2', name: '이영희', role: '학생지원부', email: 'lee@school.kr' },
-  { id: 'user-3', name: '박민수', role: '행정실장', email: 'park@school.kr' },
-  { id: 'user-4', name: '정수진', role: '학부모회장', email: 'jung@school.kr' },
-  { id: 'user-5', name: '최동현', role: '2학년 담임', email: 'choi@school.kr' },
-  { id: 'user-6', name: '한지민', role: '교육청', email: 'han@edu.kr' },
-  { id: 'user-7', name: '오세훈', role: '보건교사', email: 'oh@school.kr' },
-  { id: 'user-8', name: '윤서연', role: '상담교사', email: 'yoon@school.kr' },
-];
 
 export default function MessageCenterWindow() {
   const [activeTab, setActiveTab] = useState<MessageTab>('received');
@@ -264,14 +110,35 @@ export default function MessageCenterWindow() {
   const [isSending, setIsSending] = useState(false);
   const [showContactPicker, setShowContactPicker] = useState(false);
   const [contactSearch, setContactSearch] = useState('');
-  const [selectedContacts, setSelectedContacts] = useState<typeof sampleContacts>([]);
+  const [selectedContacts, setSelectedContacts] = useState<ContactOption[]>([]);
+  const [contactOptions, setContactOptions] = useState<ContactOption[]>([]);
   const composeContentRef = useRef<HTMLTextAreaElement>(null);
-
-  const messages = useMemo(() => createFakeMessages(50), []);
+  const [messages] = useState<MessageItem[]>([]);
 
   // 다운로드 설정 로드
   useEffect(() => {
     useDownloadStore.getState().loadSettings();
+  }, []);
+
+  useEffect(() => {
+    const loadContacts = async () => {
+      try {
+        const result = await window.electronAPI?.getAllAddressBookEntries?.();
+        const entries = result?.success ? result.data : [];
+        const mapped = entries.map((entry: any, index: number) => ({
+          id: entry.userId || entry.id || `contact-${index}`,
+          name: entry.name || entry.displayName || '알 수 없음',
+          role: entry.role || 'UNKNOWN',
+          email: entry.email || ''
+        }));
+        setContactOptions(mapped);
+      } catch (error) {
+        console.error('주소록 로드 실패:', error);
+        setContactOptions([]);
+      }
+    };
+
+    loadContacts();
   }, []);
 
   // 파일 다운로드 핸들러
@@ -407,7 +274,7 @@ export default function MessageCenterWindow() {
   };
 
   // 연락처 선택/해제
-  const toggleContact = (contact: typeof sampleContacts[0]) => {
+  const toggleContact = (contact: ContactOption) => {
     setSelectedContacts(prev => {
       const exists = prev.find(c => c.id === contact.id);
       if (exists) {
@@ -419,14 +286,14 @@ export default function MessageCenterWindow() {
 
   // 필터링된 연락처
   const filteredContacts = useMemo(() => {
-    if (!contactSearch.trim()) return sampleContacts;
+    if (!contactSearch.trim()) return contactOptions;
     const query = contactSearch.toLowerCase();
-    return sampleContacts.filter(c =>
+    return contactOptions.filter(c =>
       c.name.toLowerCase().includes(query) ||
       c.role.toLowerCase().includes(query) ||
       c.email.toLowerCase().includes(query)
     );
-  }, [contactSearch]);
+  }, [contactSearch, contactOptions]);
 
   // 첨부 파일 제거
   const removeAttachment = (attachmentId: string) => {
@@ -1217,3 +1084,5 @@ export default function MessageCenterWindow() {
     </div>
   );
 }
+
+

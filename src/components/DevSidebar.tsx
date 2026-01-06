@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNetworkStore } from '../store/network';
 import { getAppConfig, checkServerConnection } from '../services/appConfig';
-import { getTeachers, getDataStats, refreshData, clearLocalData } from '../services/dataService';
-import type { FakeTeacher } from '../services/fakeDataGenerator';
+import { getTeachers, getDataStats, refreshData, type Teacher } from '../services/dataService';
 
 interface DevSidebarProps {
   isOpen: boolean;
@@ -18,7 +17,7 @@ export const DevSidebar: React.FC<DevSidebarProps> = ({ isOpen, onClose }) => {
     mode: string;
     serverConnected: boolean;
   } | null>(null);
-  const [teachers, setTeachers] = useState<FakeTeacher[]>([]);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [serverStatus, setServerStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking');
   const appConfig = getAppConfig();
@@ -613,54 +612,6 @@ export const DevSidebar: React.FC<DevSidebarProps> = ({ isOpen, onClose }) => {
                   </div>
                 )}
               </div>
-
-              {/* Data Generation */}
-              <div className="bg-gray-800 rounded-lg p-4">
-                <h3 className="text-sm font-semibold text-gray-300 mb-3">🧪 테스트 데이터 생성</h3>
-                <div className="space-y-2">
-                  <button
-                    onClick={async () => {
-                      if (!confirm('학교 전체 데이터를 생성하시겠습니까?\n(관리자, 담임, 교과, 전문교사 등)')) return;
-                      setIsLoadingData(true);
-                      try {
-                        await refreshData();
-                        await loadStats();
-                        alert('학교 데이터가 생성되었습니다!');
-                      } catch (error) {
-                        alert('생성 실패: ' + error);
-                      } finally {
-                        setIsLoadingData(false);
-                      }
-                    }}
-                    disabled={isLoadingData}
-                    className="w-full px-3 py-2 bg-blue-700 hover:bg-blue-600 rounded text-sm transition-colors disabled:opacity-50"
-                  >
-                    🏫 학교 데이터 생성 (6학년 × 4반)
-                  </button>
-                  <button
-                    onClick={async () => {
-                      if (!confirm('기존 데이터를 모두 삭제하고 새로 생성하시겠습니까?')) return;
-                      setIsLoadingData(true);
-                      try {
-                        // 로컬 스토리지 초기화
-                        localStorage.removeItem('edu-teachers');
-                        localStorage.removeItem('edu-messages');
-                        await refreshData();
-                        await loadStats();
-                        alert('데이터가 초기화되었습니다!');
-                      } catch (error) {
-                        alert('초기화 실패: ' + error);
-                      } finally {
-                        setIsLoadingData(false);
-                      }
-                    }}
-                    disabled={isLoadingData}
-                    className="w-full px-3 py-2 bg-red-700 hover:bg-red-600 rounded text-sm transition-colors disabled:opacity-50"
-                  >
-                    🗑️ 데이터 초기화 및 재생성
-                  </button>
-                </div>
-              </div>
             </div>
           )}
         </div>
@@ -675,3 +626,4 @@ export const DevSidebar: React.FC<DevSidebarProps> = ({ isOpen, onClose }) => {
 };
 
 export default DevSidebar;
+

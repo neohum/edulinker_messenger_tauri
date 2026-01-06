@@ -58,18 +58,12 @@ export function createElectronAPI() {
     updateUserProfileOffline: (profileData: any) => ipcInvoke('auth:update-user-profile-offline', profileData),
     checkNetworkStatus: () => ipcInvoke('check-network-status'),
     checkInternalNetworkIp: () => ipcInvoke('check-internal-network-ip'),
-    seedDemoData: () => ipcInvoke('auth:seed-demo-data'),
-    seedFromJsonFile: (filePath: string) => ipcInvoke('auth:seed-from-json', filePath),
-
     // Offline Auth
     offlineLogin: (credentials: any) => ipcInvoke('auth:offline-login', credentials),
     offlineRegister: (data: any) => ipcInvoke('auth:offline-register', data),
     validateOfflineSession: (token: string) => ipcInvoke('auth:validate-offline-session', token),
     syncUsers: (onlineUsers: any[]) => ipcInvoke('auth:sync-users', onlineUsers),
     getOfflineUsers: () => ipcInvoke('auth:get-offline-users'),
-    seedTeacherData: (count: number) => ipcInvoke('auth:seed-teacher-data', count),
-    seedFakeUsers: (options: any) => ipcInvoke('auth:seed-fake-users', options),
-
     // Window controls
     minimizeWindow: () => ipcInvoke('window:minimize'),
     maximizeWindow: () => ipcInvoke('window:maximize'),

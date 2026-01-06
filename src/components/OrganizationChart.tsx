@@ -2,8 +2,6 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useMessagingStore } from '../store/messaging';
 import { useAuthStore } from '../store/auth';
 import { useMessageSettingsStore, DefaultContactAction } from '../store/messageSettings';
-import { isLocalMode } from '../services/appConfig';
-import { generateSchoolData, FakeTeacher } from '../services/fakeDataGenerator';
 import TiptapEditor from './TiptapEditor';
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
@@ -110,6 +108,25 @@ export default function OrganizationChart({ onProfileEdit }: OrganizationChartPr
     loadSettings();
     loadOrganizationData();
   }, [currentUser?.id, currentUser?.grade, currentUser?.class, currentUser?.jobTitle]);
+
+  // 트리 상태 변경 시 localStorage에 저장
+  useEffect(() => {
+    if (treeData.length > 0) {
+      const expandedState: Record<string, boolean> = {};
+      const collectExpandedState = (nodes: TreeNode[]) => {
+        nodes.forEach(node => {
+          if (node.type === 'group') {
+            expandedState[node.id] = node.isExpanded || false;
+          }
+          if (node.children) {
+            collectExpandedState(node.children);
+          }
+        });
+      };
+      collectExpandedState(treeData);
+      localStorage.setItem('organizationChart_expandedState', JSON.stringify(expandedState));
+    }
+  }, [treeData]);
 
   // Tauri 파일 드래그 앤 드롭 이벤트 리스너
   useEffect(() => {
@@ -239,12 +256,33 @@ export default function OrganizationChart({ onProfileEdit }: OrganizationChartPr
     };
   }, [showMessageDialog]);
 
-  // 컨텍스트 메뉴 외부 클릭 시 닫기
+  // 컨텍스트 메뉴 외부 클릭 시 닫기 및 포커스 이동 시 닫기
   useEffect(() => {
     const handleClickOutside = () => setContextMenu(null);
+    const handleBlur = () => setContextMenu(null);
+    const handleFocusOut = () => setContextMenu(null);
+    const handleMouseDown = () => setContextMenu(null);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // ESC, Tab, Enter 등 키 입력 시 닫기
+      if (e.key === 'Escape' || e.key === 'Tab' || e.key === 'Enter') {
+        setContextMenu(null);
+      }
+    };
+
     if (contextMenu) {
       document.addEventListener('click', handleClickOutside);
-      return () => document.removeEventListener('click', handleClickOutside);
+      document.addEventListener('mousedown', handleMouseDown);
+      window.addEventListener('blur', handleBlur);
+      document.addEventListener('focusout', handleFocusOut);
+      document.addEventListener('keydown', handleKeyDown);
+
+      return () => {
+        document.removeEventListener('click', handleClickOutside);
+        document.removeEventListener('mousedown', handleMouseDown);
+        window.removeEventListener('blur', handleBlur);
+        document.removeEventListener('focusout', handleFocusOut);
+        document.removeEventListener('keydown', handleKeyDown);
+      };
     }
   }, [contextMenu]);
 
@@ -258,6 +296,12 @@ export default function OrganizationChart({ onProfileEdit }: OrganizationChartPr
   const handleContextMenu = (e: React.MouseEvent, user: User) => {
     e.preventDefault();
     e.stopPropagation();
+
+    // 자기 자신은 컨텍스트 메뉴를 열 수 없음
+    if (currentUser && user.id === currentUser.id) {
+      return;
+    }
+
     setContextMenu({ x: e.clientX, y: e.clientY, user });
   };
 
@@ -314,6 +358,11 @@ export default function OrganizationChart({ onProfileEdit }: OrganizationChartPr
 
   // 사용자 클릭 처리 (기본 동작에 따라)
   const handleUserClick = (user: User) => {
+    // 자기 자신은 클릭할 수 없음
+    if (currentUser && user.id === currentUser.id) {
+      return;
+    }
+
     if (defaultContactAction === 'ask') {
       // 매번 물어보기
       setActionDialogUser(user);
@@ -354,113 +403,83 @@ export default function OrganizationChart({ onProfileEdit }: OrganizationChartPr
 
       let extendedUsers: User[] = [];
 
-      // 로컬 모드: 페이크 데이터 생성
-      if (isLocalMode()) {
-        console.log('[OrganizationChart] 로컬 모드: 페이크 데이터 생성');
-        const schoolData = generateSchoolData({
-          grades: 6,
-          classesPerGrade: 4,
-          subjectTeachers: 10,
-          includeSpecialists: true
-        });
+      // 로컬/원격 모두 주소록 기반으로 로드
+      const result = await window.electronAPI?.getAllAddressBookEntries?.();
+      console.log('Address book result:', result);
+      const addressBook = result?.success ? result.data : [];
+      console.log('Address book data:', addressBook);
+      console.log('Address book length:', addressBook.length);
 
-        extendedUsers = [...schoolData.admins, ...schoolData.teachers].map((teacher: FakeTeacher) => ({
-          id: teacher.id,
-          name: teacher.name,
-          email: teacher.email,
-          role: teacher.role,
-          department: teacher.workplace,
-          grade: teacher.grade,
-          group: teacher.class,
-          class: teacher.class,
-          jobTitle: teacher.jobTitle,
-          workplace: teacher.workplace,
-          adminDuties: teacher.adminDuties,
-          extensionNumber: teacher.extensionNumber,
-          phoneNumber: teacher.phoneNumber,
-          subjects: teacher.subjects,
-          isOnline: teacher.isOnline
-        }));
+      extendedUsers = addressBook.map((entry: any, index: number) => {
+        console.log('Processing address book entry:', entry);
+        return {
+          id: entry.id || entry.userId || `user-${index}`,
+          name: entry.name || entry.displayName,
+          email: entry.email,
+          role: entry.role,
+          department: entry.department || entry.workplace || '일반',
+          grade: entry.grade,
+          group: entry.class || '미배정',
+          class: entry.class,
+          jobTitle: entry.jobTitle || entry.role,
+          workplace: entry.workplace || '교무실',
+          adminDuties: entry.adminDuties,
+          extensionNumber: entry.extensionNumber,
+          phoneNumber: entry.phoneNumber,
+          subjects: entry.subjects,
+          isOnline: entry.isOnline || false
+        };
+      });
 
-        // 현재 로그인한 사용자도 조직도에 추가 (중복 방지)
-        if (currentUser && !extendedUsers.some(u => u.id === currentUser.id)) {
-          const currentUserEntry: User = {
-            id: currentUser.id,
-            name: currentUser.name || '나',
-            email: currentUser.email || '',
-            role: currentUser.role || 'TEACHER',
-            department: currentUser.workplace,
-            grade: currentUser.grade,
-            group: currentUser.class,
-            class: currentUser.class,
-            jobTitle: currentUser.jobTitle || '담임교사',
-            workplace: currentUser.workplace || '교무실',
-            adminDuties: currentUser.adminDuties,
-            extensionNumber: currentUser.extensionNumber,
-            phoneNumber: currentUser.phoneNumber,
-            subjects: currentUser.subjects,
-            isOnline: true // 현재 사용자는 항상 온라인
-          };
-          extendedUsers.push(currentUserEntry);
-          console.log('[OrganizationChart] 현재 사용자 추가:', currentUserEntry);
+      // 현재 로그인한 사용자도 조직도에 추가 (중복 방지)
+      if (currentUser && !extendedUsers.some(u => u.id === currentUser.id)) {
+        // organizationGroup에 따라 workplace와 jobTitle 자동 설정
+        let autoWorkplace = currentUser.workplace;
+        let autoJobTitle = currentUser.jobTitle;
+
+        const orgGroup = (currentUser as any).organizationGroup;
+        if (orgGroup) {
+          if (orgGroup === '교장실') {
+            autoWorkplace = '교장실';
+            autoJobTitle = autoJobTitle || '교장';
+          } else if (orgGroup === '교무실') {
+            autoWorkplace = '교무실';
+            autoJobTitle = autoJobTitle || '교무실무원';
+          } else if (orgGroup === '행정실') {
+            autoWorkplace = '행정실';
+            autoJobTitle = autoJobTitle || '행정직원';
+          } else if (orgGroup === '전담실') {
+            autoWorkplace = '전담실';
+            autoJobTitle = autoJobTitle || '전담교사';
+          } else if (orgGroup.match(/^[1-6]학년$/)) {
+            const gradeNum = parseInt(orgGroup);
+            autoWorkplace = autoWorkplace || '교무실';
+            autoJobTitle = autoJobTitle || '담임교사';
+          }
         }
 
-        console.log(`[OrganizationChart] 로컬 모드: ${extendedUsers.length}명 생성 완료`);
-      } else {
-        // 원격 모드: 로컬 데이터베이스의 주소록 데이터 가져오기
-        const result = await window.electronAPI?.getAllAddressBookEntries?.();
-        console.log('Address book result:', result);
-        const addressBook = result?.success ? result.data : [];
-        console.log('Address book data:', addressBook);
-        console.log('Address book length:', addressBook.length);
-
-        // 데모 데이터로 사용자 정보 확장 (실제 데이터 기반 그룹화)
-        extendedUsers = addressBook.map((entry: any, index: number) => {
-          console.log('Processing address book entry:', entry);
-          return {
-            id: entry.id || entry.userId || `user-${index}`,
-            name: entry.name || entry.displayName,
-            email: entry.email,
-            role: entry.role,
-            department: entry.department || entry.workplace || '일반',
-            grade: entry.grade,
-            group: entry.class || '미배정',
-            class: entry.class,
-            jobTitle: entry.jobTitle || entry.role,
-            workplace: entry.workplace || '교무실',
-            adminDuties: entry.adminDuties,
-            extensionNumber: entry.extensionNumber,
-            phoneNumber: entry.phoneNumber,
-            subjects: entry.subjects,
-            isOnline: entry.isOnline || false
-          };
-        });
-
-        // 현재 로그인한 사용자도 조직도에 추가 (중복 방지)
-        if (currentUser && !extendedUsers.some(u => u.id === currentUser.id)) {
-          const currentUserEntry: User = {
-            id: currentUser.id,
-            name: currentUser.name || '나',
-            email: currentUser.email || '',
-            role: currentUser.role || 'TEACHER',
-            department: currentUser.workplace,
-            grade: currentUser.grade,
-            group: currentUser.class,
-            class: currentUser.class,
-            jobTitle: currentUser.jobTitle || '담임교사',
-            workplace: currentUser.workplace || '교무실',
-            adminDuties: currentUser.adminDuties,
-            extensionNumber: currentUser.extensionNumber,
-            phoneNumber: currentUser.phoneNumber,
-            subjects: currentUser.subjects,
-            isOnline: true // 현재 사용자는 항상 온라인
-          };
-          extendedUsers.push(currentUserEntry);
-          console.log('[OrganizationChart] 현재 사용자 추가:', currentUserEntry);
-        }
-
-        console.log('Extended users:', extendedUsers);
+        const currentUserEntry: User = {
+          id: currentUser.id,
+          name: currentUser.name || '나',
+          email: currentUser.email || '',
+          role: currentUser.role || 'TEACHER',
+          department: autoWorkplace,
+          grade: currentUser.grade,
+          group: currentUser.class,
+          class: currentUser.class,
+          jobTitle: autoJobTitle || '담임교사',
+          workplace: autoWorkplace || '교무실',
+          adminDuties: currentUser.adminDuties,
+          extensionNumber: currentUser.extensionNumber,
+          phoneNumber: currentUser.phoneNumber,
+          subjects: currentUser.subjects,
+          isOnline: true // 현재 사용자는 항상 온라인
+        };
+        extendedUsers.push(currentUserEntry);
+        console.log('[OrganizationChart] 현재 사용자 추가:', currentUserEntry);
       }
+
+      console.log('Extended users:', extendedUsers);
 
       setAllUsers(extendedUsers);
 
@@ -508,7 +527,29 @@ export default function OrganizationChart({ onProfileEdit }: OrganizationChartPr
         });
       }
 
-      // 3. 학년별 담임교사
+      // 3. 행정실
+      const adminOffice = extendedUsers.filter(u =>
+        u.workplace === '행정실' || u.jobTitle === '행정실장' || u.jobTitle === '행정직원' || u.role === 'ADMIN'
+      );
+      if (adminOffice.length > 0) {
+        treeNodes.push({
+          id: 'group-admin-office',
+          name: '행정실',
+          type: 'group',
+          isExpanded: false,
+          children: adminOffice.sort((a, b) => {
+            const priority: Record<string, number> = { '행정실장': 1, '행정직원': 2 };
+            return (priority[a.jobTitle || ''] || 99) - (priority[b.jobTitle || ''] || 99);
+          }).map(user => ({
+            id: `user-${user.id}`,
+            name: user.name,
+            type: 'user',
+            user
+          }))
+        });
+      }
+
+      // 4. 학년별 담임교사
       const grades = [1, 2, 3, 4, 5, 6];
       for (const grade of grades) {
         const gradeTeachers = extendedUsers.filter(u =>
@@ -536,7 +577,7 @@ export default function OrganizationChart({ onProfileEdit }: OrganizationChartPr
         }
       }
 
-      // 4. 전담실 (전담교사, 교과교사, 전문교사)
+      // 5. 전담실 (전담교사, 교과교사, 전문교사)
       const specialists = extendedUsers.filter(u =>
         u.workplace === '전담실' ||
         ['보건교사', '영양교사', '상담교사', '사서교사', '특수교사'].includes(u.jobTitle || '') ||
@@ -557,20 +598,24 @@ export default function OrganizationChart({ onProfileEdit }: OrganizationChartPr
         });
       }
 
-      // 5. 행정실
-      const adminOffice = extendedUsers.filter(u =>
-        u.workplace === '행정실' || u.jobTitle === '행정실장' || u.jobTitle === '행정직원' || u.role === 'ADMIN'
-      );
-      if (adminOffice.length > 0) {
+      // 6. 미배정 (어떤 그룹에도 속하지 않은 사용자)
+      const assignedUserIds = new Set<string>();
+      treeNodes.forEach(group => {
+        group.children?.forEach(child => {
+          if (child.user) {
+            assignedUserIds.add(child.user.id);
+          }
+        });
+      });
+
+      const unassignedUsers = extendedUsers.filter(u => !assignedUserIds.has(u.id));
+      if (unassignedUsers.length > 0) {
         treeNodes.push({
-          id: 'group-admin-office',
-          name: '행정실',
+          id: 'group-unassigned',
+          name: '미배정',
           type: 'group',
-          isExpanded: false,
-          children: adminOffice.sort((a, b) => {
-            const priority: Record<string, number> = { '행정실장': 1, '행정직원': 2 };
-            return (priority[a.jobTitle || ''] || 99) - (priority[b.jobTitle || ''] || 99);
-          }).map(user => ({
+          isExpanded: true,
+          children: unassignedUsers.map(user => ({
             id: `user-${user.id}`,
             name: user.name,
             type: 'user',
@@ -579,7 +624,31 @@ export default function OrganizationChart({ onProfileEdit }: OrganizationChartPr
         });
       }
 
-      setTreeData(treeNodes);
+      // localStorage에서 저장된 펼침 상태 불러오기
+      const savedExpandedState = localStorage.getItem('organizationChart_expandedState');
+      if (savedExpandedState) {
+        try {
+          const expandedState: Record<string, boolean> = JSON.parse(savedExpandedState);
+          const applyExpandedState = (nodes: TreeNode[]): TreeNode[] => {
+            return nodes.map(node => {
+              if (node.type === 'group' && expandedState[node.id] !== undefined) {
+                return {
+                  ...node,
+                  isExpanded: expandedState[node.id],
+                  children: node.children ? applyExpandedState(node.children) : node.children
+                };
+              }
+              return node;
+            });
+          };
+          setTreeData(applyExpandedState(treeNodes));
+        } catch (e) {
+          console.error('Failed to parse expanded state:', e);
+          setTreeData(treeNodes);
+        }
+      } else {
+        setTreeData(treeNodes);
+      }
     } catch (error) {
       console.error('Failed to load organization data:', error);
       setTreeData([]);
@@ -604,7 +673,12 @@ export default function OrganizationChart({ onProfileEdit }: OrganizationChartPr
     setTreeData(updateNode(treeData));
   };
 
-  const toggleNodeCheck = (nodeId: string) => {
+  const toggleNodeCheck = (nodeId: string, userId?: string) => {
+    // 자기 자신은 선택할 수 없음
+    if (userId && currentUser && userId === currentUser.id) {
+      return;
+    }
+
     const updateNodeCheck = (nodes: TreeNode[]): TreeNode[] => {
       return nodes.map(node => {
         if (node.id === nodeId) {
@@ -624,7 +698,9 @@ export default function OrganizationChart({ onProfileEdit }: OrganizationChartPr
   };
 
   const updateNodeWithChildren = (node: TreeNode, checked: boolean): TreeNode => {
-    const updatedNode = { ...node, isChecked: checked, isIndeterminate: false };
+    // 자기 자신은 체크하지 않음
+    const isSelf = node.type === 'user' && node.user?.id === currentUser?.id;
+    const updatedNode = { ...node, isChecked: isSelf ? false : checked, isIndeterminate: false };
 
     if (updatedNode.children) {
       updatedNode.children = updatedNode.children.map(child =>
@@ -1119,13 +1195,14 @@ export default function OrganizationChart({ onProfileEdit }: OrganizationChartPr
   const renderTreeNode = (node: TreeNode, level: number = 0): React.ReactNode => {
     const hasChildren = node.children && node.children.length > 0;
     const isExpanded = node.isExpanded;
+    const isSelf = node.type === 'user' && node.user?.id === currentUser?.id;
 
     return (
       <div key={node.id} className="select-none">
         <div
-          className={`flex items-center py-2 px-4 hover:bg-white/20 cursor-pointer border-l-2 ${
+          className={`flex items-center py-2 px-4 border-l-2 ${
             level === 0 ? 'border-transparent' : 'border-current/20'
-          }`}
+          } ${isSelf ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/20 cursor-pointer'}`}
           style={{ paddingLeft: `${16 + level * 20}px` }}
           onClick={(e) => {
             // 사용자 노드 클릭 시 기본 동작 실행
@@ -1150,8 +1227,9 @@ export default function OrganizationChart({ onProfileEdit }: OrganizationChartPr
               ref={(el) => {
                 if (el) el.indeterminate = node.isIndeterminate || false;
               }}
-              onChange={() => toggleNodeCheck(node.id)}
-              className="w-4 h-4 text-blue-600 bg-white/80 border-current/30 rounded focus:ring-blue-500 focus:ring-2"
+              onChange={() => toggleNodeCheck(node.id, node.user?.id)}
+              disabled={node.type === 'user' && node.user?.id === currentUser?.id}
+              className="w-4 h-4 text-blue-600 bg-white/80 border-current/30 rounded focus:ring-blue-500 focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -1226,6 +1304,10 @@ export default function OrganizationChart({ onProfileEdit }: OrganizationChartPr
               <div className={`text-xs flex items-center space-x-3 mt-0.5 ${node.user.isOnline ? 'theme-text' : 'theme-text-secondary'}`}>
                 {/* 직책 */}
                 <span>{node.user.jobTitle || node.user.role}</span>
+                {/* 근무장소 */}
+                {node.user.workplace && (
+                  <span>{node.user.workplace}</span>
+                )}
                 {/* 내선 */}
                 {node.user.extensionNumber && (
                   <span>내선 {node.user.extensionNumber}</span>
@@ -1261,6 +1343,27 @@ export default function OrganizationChart({ onProfileEdit }: OrganizationChartPr
               <h3 className="text-lg font-semibold theme-text">학교 조직도</h3>
               <p className="text-sm theme-text-secondary">전체 {allUsers.length}명</p>
             </div>
+            <button
+              onClick={loadOrganizationData}
+              disabled={isLoading}
+              className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+              title="조직도 새로고침"
+            >
+              <svg
+                className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+              새로고침
+            </button>
           </div>
 
           {/* 검색 */}

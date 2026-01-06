@@ -4,9 +4,7 @@ import { useAuthStore } from '../store/auth';
 import { useNotificationStore } from '../store/notifications';
 import { isLocalMode } from '../services/appConfig';
 import { addressBookService } from '../services/addressBook';
-import { generateFakeMessages } from '../services/fakeDataGenerator';
 import type { P2PStatus, PeerInfo, Contact, FormattedMessage } from '../types/messaging';
-import { getRandomAutoReply } from '../types/messaging';
 
 function mapEntryToContact(entry: any): Contact {
   return {
@@ -146,14 +144,52 @@ export default function MessagingPanel() {
   // P2P 이벤트 리스너 설정
   useEffect(() => {
     // 피어 발견
-    const handlePeerDiscovered = (peer: PeerInfo) => {
+    const handlePeerDiscovered = async (peer: PeerInfo) => {
       console.log('[MessagingPanel] Peer discovered:', peer);
       setDiscoveredPeers(prev => new Map(prev).set(peer.userId, peer));
       setP2PStatus(prev => ({ ...prev, peerCount: prev.peerCount + 1 }));
 
-      // 연락처에 온라인 상태 업데이트
-      if (contacts.find(c => c.userId === peer.userId)) {
+      // 연락처에 있는지 확인
+      const existingContact = contacts.find(c => c.userId === peer.userId);
+
+      if (existingContact) {
+        // 이미 있으면 온라인 상태만 업데이트
         setContacts(updateContactStatus(contacts, peer.userId, true));
+      } else {
+        // 없으면 새로 추가 (주소록에도 저장)
+        const newContact: Contact = {
+          userId: peer.userId,
+          name: peer.userName || peer.userId,
+          email: peer.userId + '@local',
+          role: 'TEACHER',
+          schoolId: peer.schoolId,
+          isOnline: true,
+          lastSeen: new Date().toISOString(),
+        };
+
+        // 연락처 목록에 추가
+        setContacts(prev => [...prev, newContact]);
+
+        // 주소록에도 저장
+        try {
+          await addressBookService.saveEntry({
+            userId: peer.userId,
+            name: peer.userName || peer.userId,
+            email: peer.userId + '@local',
+            role: 'TEACHER',
+            schoolId: peer.schoolId || '',
+            ipAddress: peer.ipAddress || '',
+            hostname: peer.userId,
+            os: 'unknown',
+            platform: 'unknown',
+            lastSeen: new Date().toISOString(),
+            isOnline: true,
+            synced: false,
+          });
+          console.log('[MessagingPanel] 새 피어를 주소록에 추가:', peer.userId);
+        } catch (error) {
+          console.error('[MessagingPanel] 주소록 저장 실패:', error);
+        }
       }
     };
 
@@ -405,37 +441,7 @@ export default function MessagingPanel() {
         console.warn('[MessagingPanel] P2P 메시지 로드 실패, 대체 방법 시도:', p2pError);
       }
 
-      // 2. 로컬 모드에서는 페이크 메시지 생성
-      if (isLocalMode()) {
-        const contact = contacts.find(c => c.userId === otherUserId);
-        const fakeMessages = generateFakeMessages(
-          user.id,
-          user.name || '나',
-          otherUserId,
-          Math.floor(Math.random() * 10) + 5 // 5-14개 랜덤 메시지
-        );
-
-        const formattedMessages = fakeMessages.map((msg) => ({
-          id: msg.id,
-          messageId: msg.id,
-          senderId: msg.senderId,
-          senderName: msg.senderId === user.id ? (user.name || '나') : (contact?.name || msg.senderName),
-          recipientId: msg.recipientId,
-          content: msg.content,
-          type: msg.type,
-          timestamp: msg.timestamp,
-          isRead: msg.isRead,
-          readAt: msg.isRead ? msg.timestamp : undefined,
-          delivered: msg.delivered,
-          deliveredAt: msg.delivered ? msg.timestamp : undefined
-        }));
-
-        setMessages(formattedMessages);
-        console.log(`[MessagingPanel] 로컬 모드: ${formattedMessages.length}개 메시지 생성`);
-        return;
-      }
-
-      // 3. 원격 모드 폴백
+      // 2. 로컬/오프라인 메시지 로드
       const result = await window.electronAPI?.getOfflineMessages?.(user.id, otherUserId);
       if (result?.success && result.messages) {
         const formattedMessages = result.messages.map((msg: any) => ({
@@ -453,9 +459,12 @@ export default function MessagingPanel() {
           deliveredAt: msg.deliveredAt
         }));
         setMessages(formattedMessages);
+        return;
       }
+      setMessages([]);
     } catch (error) {
       console.error('Failed to load messages:', error);
+      setMessages([]);
     } finally {
       setLoading(false);
     }
@@ -530,38 +539,7 @@ export default function MessagingPanel() {
         }
       }
 
-      // 2. 로컬 모드 시뮬레이션
-      if (isLocalMode()) {
-        // 로컬 모드: 1-3초 후 자동 응답 시뮬레이션
-        const contact = contacts.find(c => c.userId === selectedContact.userId);
-        setTimeout(() => {
-          const autoReply = {
-            id: `local-reply-${Date.now()}`,
-            messageId: `local-reply-${Date.now()}`,
-            senderId: selectedContact.userId,
-            senderName: contact?.name || selectedContact.name,
-            recipientId: user.id,
-            content: getRandomAutoReply(),
-            type: 'text' as const,
-            timestamp: new Date().toISOString(),
-            isRead: false,
-            readAt: undefined,
-            delivered: true,
-            deliveredAt: new Date().toISOString()
-          };
-          addMessage(autoReply);
-          addNotification({
-            title: `새 메시지: ${autoReply.senderName}`,
-            message: autoReply.content,
-            type: 'info',
-          });
-        }, 1000 + Math.random() * 2000);
-
-        console.log('[MessagingPanel] 로컬 모드: 메시지 전송 시뮬레이션');
-        return;
-      }
-
-      // 3. 원격 서버를 통한 전송 (폴백)
+      // 2. 원격 서버를 통한 전송 (폴백)
       const result = await window.electronAPI?.sendMessage?.({
         recipientId: selectedContact.userId,
         content: sentContent,

@@ -3,6 +3,9 @@ import { useAuthStore } from '../store/auth';
 
 interface ProfileData {
   name?: string;
+  email?: string;
+  role?: string;
+  organizationGroup?: string;
   grade?: number;
   class?: string;
   classroom?: string;
@@ -22,6 +25,9 @@ export default function ProfileSettingsPage({ onCancel }: ProfileSettingsPagePro
   const { user, token, setAuth } = useAuthStore();
   const [formData, setFormData] = useState<ProfileData>({
     name: user?.name || '',
+    email: user?.email || '',
+    role: user?.role || '교사',
+    organizationGroup: (user as any)?.organizationGroup || '',
     grade: user?.grade || undefined,
     class: user?.class || '',
     classroom: user?.classroom || '',
@@ -36,11 +42,60 @@ export default function ProfileSettingsPage({ onCancel }: ProfileSettingsPagePro
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [subjectInput, setSubjectInput] = useState('');
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [availableRoles, setAvailableRoles] = useState<string[]>([
+    '교사',
+    '교장',
+    '교감',
+    '행정실장',
+    '행정실',
+    '교무',
+    '전담',
+    '영양사',
+    '영양교사',
+    '보건교사',
+    '보건실',
+    '교무실무원',
+    '과학실무원',
+    '정보실무원'
+  ]);
 
-  // 컴포넌트 마운트 시 스크롤을 상단으로 이동
+  // 컴포넌트 마운트 시 스크롤을 상단으로 이동 및 서버에서 역할 목록 가져오기
   useEffect(() => {
     window.scrollTo(0, 0);
+    loadAvailableRoles();
   }, []);
+
+  // 서버에서 사용 가능한 역할 목록 가져오기
+  const loadAvailableRoles = async () => {
+    try {
+      const result = await window.electronAPI?.getAvailableRoles?.();
+      if (result?.success && result.roles && result.roles.length > 0) {
+        // 서버에서 가져온 역할과 기본 역할을 합침 (중복 제거)
+        const defaultRoles = [
+          '교사',
+          '교장',
+          '교감',
+          '행정실장',
+          '행정실',
+          '교무',
+          '전담',
+          '영양사',
+          '영양교사',
+          '보건교사',
+          '보건실',
+          '교무실무원',
+          '과학실무원',
+          '정보실무원'
+        ];
+        const combinedRoles = Array.from(new Set([...defaultRoles, ...result.roles]));
+        setAvailableRoles(combinedRoles);
+      }
+    } catch (error) {
+      console.error('역할 목록 로드 실패:', error);
+      // 실패 시 기본 역할 유지
+    }
+  };
 
   const handleInputChange = (field: keyof ProfileData, value: string | number | undefined) => {
     setFormData(prev => ({
@@ -99,6 +154,7 @@ export default function ProfileSettingsPage({ onCancel }: ProfileSettingsPagePro
           ...formData
         });
         setSuccess('프로필이 성공적으로 업데이트되었습니다.');
+        setShowSuccessModal(true);
       } else {
         setError(result?.error || '프로필 업데이트에 실패했습니다.');
       }
@@ -150,14 +206,29 @@ export default function ProfileSettingsPage({ onCancel }: ProfileSettingsPagePro
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">역할</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">이메일</label>
                 <input
-                  type="text"
-                  value={user?.role === 'TEACHER' ? '교사' : user?.role === 'ADMIN' ? '학교 관리자' : user?.role === 'STUDENT' ? '학생' : '기타'}
-                  disabled
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-500"
+                  type="email"
+                  value={formData.email || ''}
+                  onChange={(e) => handleInputChange('email', e.target.value)}
+                  placeholder="example@school.com"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                <p className="text-xs text-gray-500 mt-1">역할은 변경할 수 없습니다</p>
+                <p className="text-xs text-gray-500 mt-1">이메일을 입력하면 해당 학교 서비스에 접근할 수 있습니다</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">역할</label>
+                <select
+                  value={formData.role || '교사'}
+                  onChange={(e) => handleInputChange('role', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {availableRoles.map(role => (
+                    <option key={role} value={role}>{role}</option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
@@ -171,6 +242,26 @@ export default function ProfileSettingsPage({ onCancel }: ProfileSettingsPagePro
               학급 정보
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">소속 그룹</label>
+                <select
+                  value={formData.organizationGroup || ''}
+                  onChange={(e) => handleInputChange('organizationGroup', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">미배정</option>
+                  <option value="교장실">교장실</option>
+                  <option value="교무실">교무실</option>
+                  <option value="행정실">행정실</option>
+                  <option value="1학년">1학년</option>
+                  <option value="2학년">2학년</option>
+                  <option value="3학년">3학년</option>
+                  <option value="4학년">4학년</option>
+                  <option value="5학년">5학년</option>
+                  <option value="6학년">6학년</option>
+                  <option value="전담실">전담실</option>
+                </select>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">학년</label>
                 <select
@@ -352,6 +443,29 @@ export default function ProfileSettingsPage({ onCancel }: ProfileSettingsPagePro
           </div>
         </form>
       </div>
+
+      {/* 성공 모달 */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 max-w-sm mx-4">
+            <div className="flex flex-col items-center">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">저장 완료</h3>
+              <p className="text-gray-600 text-center mb-6">프로필이 성공적으로 업데이트되었습니다.</p>
+              <button
+                onClick={() => setShowSuccessModal(false)}
+                className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,12 +1,43 @@
 // 데이터 서비스 - 로컬/원격 모드에 따라 데이터 소스 전환
 // .env의 VITE_APP_MODE에 따라 동작
 
-import { getAppConfig, isLocalMode, checkServerConnection } from './appConfig';
-import { generateSchoolData, generateFakeMessages, type FakeTeacher, type FakeMessage } from './fakeDataGenerator';
+import { getAppConfig, checkServerConnection } from './appConfig';
+
+export interface Teacher {
+  id: string;
+  email?: string;
+  name?: string;
+  role?: 'TEACHER' | 'ADMIN' | string;
+  grade?: number;
+  class?: string;
+  classroom?: string;
+  workplace?: string;
+  jobTitle?: string;
+  adminDuties?: string;
+  subjects?: string[];
+  extensionNumber?: string;
+  phoneNumber?: string;
+  isOnline?: boolean;
+  lastSeen?: string;
+}
+
+export interface Message {
+  id: string;
+  senderId: string;
+  senderName: string;
+  recipientId: string;
+  content: string;
+  type: 'text' | 'file' | 'image';
+  timestamp: string;
+  isRead: boolean;
+  delivered: boolean;
+  readAt?: string;
+  deliveredAt?: string;
+}
 
 // 캐시된 데이터
-let cachedTeachers: FakeTeacher[] | null = null;
-let cachedMessages: Map<string, FakeMessage[]> = new Map();
+let cachedTeachers: Teacher[] | null = null;
+let cachedMessages: Map<string, Message[]> = new Map();
 
 // 초기화 상태
 let isInitialized = false;
@@ -18,11 +49,6 @@ export async function initializeDataService(): Promise<void> {
   const config = getAppConfig();
   console.log(`[DataService] 초기화 - 모드: ${config.appMode}`);
 
-  if (isLocalMode() || config.appMode === 'hybrid') {
-    // 로컬 모드: 페이크 데이터 생성
-    await seedLocalData();
-  }
-
   if (config.appMode === 'hybrid' || config.appMode === 'remote') {
     // 서버 연결 시도
     const isConnected = await checkServerConnection();
@@ -32,42 +58,8 @@ export async function initializeDataService(): Promise<void> {
   isInitialized = true;
 }
 
-// 로컬 데이터 시딩
-async function seedLocalData(): Promise<void> {
-  const config = getAppConfig();
-
-  if (!config.autoSeedData) {
-    console.log('[DataService] 자동 시딩 비활성화됨');
-    return;
-  }
-
-  console.log('[DataService] 페이크 데이터 생성 중...');
-
-  const schoolData = generateSchoolData({
-    grades: 6,
-    classesPerGrade: 4,
-    subjectTeachers: 10,
-    includeSpecialists: true
-  });
-
-  cachedTeachers = [...schoolData.admins, ...schoolData.teachers];
-
-  console.log(`[DataService] ${cachedTeachers.length}명의 교사 데이터 생성 완료`);
-  console.log(`[DataService] 통계:`, schoolData.stats);
-
-  // Electron API를 통해 로컬 DB에도 저장 시도
-  try {
-    if (window.electronAPI?.seedFakeTeachers) {
-      await window.electronAPI.seedFakeTeachers(cachedTeachers);
-      console.log('[DataService] 로컬 DB에 데이터 저장 완료');
-    }
-  } catch (error) {
-    console.warn('[DataService] 로컬 DB 저장 실패 (메모리 캐시 사용):', error);
-  }
-}
-
 // 교사 목록 조회
-export async function getTeachers(): Promise<FakeTeacher[]> {
+export async function getTeachers(): Promise<Teacher[]> {
   const config = getAppConfig();
 
   // 1. 원격 모드: 서버에서 가져오기 시도
@@ -83,7 +75,9 @@ export async function getTeachers(): Promise<FakeTeacher[]> {
 
         if (response.ok) {
           const data = await response.json();
-          return data.teachers || [];
+          const teachers = data.teachers || [];
+          cachedTeachers = teachers;
+          return teachers;
         }
       }
     } catch (error) {
@@ -96,16 +90,12 @@ export async function getTeachers(): Promise<FakeTeacher[]> {
     }
   }
 
-  // 2. 로컬 모드 또는 폴백: 캐시된 데이터 사용
-  if (!cachedTeachers) {
-    await seedLocalData();
-  }
-
+  // 2. 로컬/폴백: 캐시된 데이터만 사용
   return cachedTeachers || [];
 }
 
 // 교사 검색
-export async function searchTeachers(query: string): Promise<FakeTeacher[]> {
+export async function searchTeachers(query: string): Promise<Teacher[]> {
   const teachers = await getTeachers();
   const lowerQuery = query.toLowerCase();
 
@@ -119,31 +109,31 @@ export async function searchTeachers(query: string): Promise<FakeTeacher[]> {
 }
 
 // 역할별 교사 조회
-export async function getTeachersByRole(role: 'TEACHER' | 'ADMIN'): Promise<FakeTeacher[]> {
+export async function getTeachersByRole(role: 'TEACHER' | 'ADMIN'): Promise<Teacher[]> {
   const teachers = await getTeachers();
   return teachers.filter(teacher => teacher.role === role);
 }
 
 // 학년별 담임교사 조회
-export async function getTeachersByGrade(grade: number): Promise<FakeTeacher[]> {
+export async function getTeachersByGrade(grade: number): Promise<Teacher[]> {
   const teachers = await getTeachers();
   return teachers.filter(teacher => teacher.grade === grade);
 }
 
 // 온라인 교사 조회
-export async function getOnlineTeachers(): Promise<FakeTeacher[]> {
+export async function getOnlineTeachers(): Promise<Teacher[]> {
   const teachers = await getTeachers();
   return teachers.filter(teacher => teacher.isOnline);
 }
 
 // 특정 교사 조회
-export async function getTeacherById(id: string): Promise<FakeTeacher | null> {
+export async function getTeacherById(id: string): Promise<Teacher | null> {
   const teachers = await getTeachers();
   return teachers.find(teacher => teacher.id === id) || null;
 }
 
 // 메시지 조회
-export async function getMessages(userId: string, contactId: string): Promise<FakeMessage[]> {
+export async function getMessages(userId: string, contactId: string): Promise<Message[]> {
   const config = getAppConfig();
   const cacheKey = `${userId}-${contactId}`;
 
@@ -171,18 +161,7 @@ export async function getMessages(userId: string, contactId: string): Promise<Fa
     }
   }
 
-  // 2. 로컬: 캐시 또는 페이크 데이터
-  if (!cachedMessages.has(cacheKey)) {
-    const user = await getTeacherById(userId);
-    const messages = generateFakeMessages(
-      userId,
-      user?.name || '나',
-      contactId,
-      10
-    );
-    cachedMessages.set(cacheKey, messages);
-  }
-
+  // 2. 로컬/폴백: 캐시된 메시지만 반환
   return cachedMessages.get(cacheKey) || [];
 }
 
@@ -192,7 +171,7 @@ export async function sendMessage(
   recipientId: string,
   content: string,
   type: 'text' | 'file' | 'image' = 'text'
-): Promise<{ success: boolean; message?: FakeMessage; error?: string }> {
+): Promise<{ success: boolean; message?: Message; error?: string }> {
   const config = getAppConfig();
 
   // 1. 원격 모드: 서버로 전송 시도
@@ -226,7 +205,7 @@ export async function sendMessage(
 
   // 2. 로컬: 캐시에 저장
   const sender = await getTeacherById(senderId);
-  const newMessage: FakeMessage = {
+  const newMessage: Message = {
     id: `msg-${Date.now()}`,
     senderId,
     senderName: sender?.name || '나',

@@ -51,7 +51,7 @@ export default forwardRef<HTMLDivElement, PageHeaderProps>(function PageHeader({
   }, []);
 
   return (
-    <header ref={ref} className="">
+    <header ref={ref} className="fixed top-12 left-0 right-0 z-40">
       {/* 기존 헤더 내용 */}
       <div className="border-b shadow-lg theme-header-bg">
         <div className="flex items-center justify-between px-4 py-3 lg:px-3 lg:py-4">
@@ -104,3 +104,4 @@ export default forwardRef<HTMLDivElement, PageHeaderProps>(function PageHeader({
     </header>
   );
 });
+
