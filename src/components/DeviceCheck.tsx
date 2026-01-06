@@ -13,36 +13,43 @@ export function DeviceCheck({ children }: DeviceCheckProps) {
   useEffect(() => {
     const checkDevice = async () => {
       try {
+        // 내부 네트워크 전용 모드: 모든 기기 자동 승인
+        console.log('[DeviceCheck] 내부 네트워크 전용 모드 - 기기 자동 승인');
+        setStatus('APPROVED');
+        return;
+
+        // 아래 코드는 추후 서버 연결 시 활성화
+        /*
         // Check if running in Electron
         if (!window.electronAPI?.getDeviceInfo) {
           console.log('Not running in Electron, skipping device check');
           setStatus('APPROVED');
           return;
         }
-        
+
         // 개발 환경이거나 오프라인 모드에서는 자동 승인
         const isDevelopment = import.meta.env.DEV;
         const isOfflineMode = !navigator.onLine || localStorage.getItem('offline_mode') === 'true';
-        
+
         if (isDevelopment || isOfflineMode) {
           console.log('Development/Offline mode: Auto-approving device');
           setStatus('APPROVED');
           return;
         }
-        
+
         const deviceInfo = await window.electronAPI.getDeviceInfo();
-        
+
         // Use environment variable for API URL
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-        
+
         const response = await fetch(`${apiUrl}/desktop/auth`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(deviceInfo),
         });
-        
+
         const data = await response.json();
-        
+
         if (data.status === 'APPROVED') {
           setStatus('APPROVED');
           if (data.token && data.user) {
@@ -55,23 +62,16 @@ export function DeviceCheck({ children }: DeviceCheckProps) {
           setStatus('DENIED');
           setMessage(data.message || '접근이 거부되었습니다.');
         }
-        
+        */
+
       } catch (error) {
-        console.error('Device check failed:', error);
-        // 네트워크 오류 시에도 개발/오프라인 모드에서는 승인
-        const isDevelopment = import.meta.env.DEV;
-        const isOfflineMode = !navigator.onLine || localStorage.getItem('offline_mode') === 'true';
-        
-        if (isDevelopment || isOfflineMode) {
-          console.log('Network error in development/offline mode: Auto-approving device');
-          setStatus('APPROVED');
-        } else {
-          setStatus('DENIED');
-          setMessage('서버 연결에 실패했습니다. 네트워크 연결을 확인해주세요.');
-        }
+        console.error('[DeviceCheck] Error:', error);
+        // 내부 네트워크 전용 모드: 에러 발생 시에도 자동 승인
+        console.log('[DeviceCheck] 에러 발생, 자동 승인 처리');
+        setStatus('APPROVED');
       }
     };
-    
+
     checkDevice();
   }, [setAuth]);
 

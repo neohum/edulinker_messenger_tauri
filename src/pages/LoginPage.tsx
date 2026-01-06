@@ -36,43 +36,54 @@ export default function LoginPage({ onSwitchToSignup }: LoginPageProps) {
   };
 
   // 에러 메시지를 친절한 한국어로 변환
-  const getFriendlyErrorMessage = (error: string) => {
+  const getFriendlyErrorMessage = (error: string, isLocalAuthError: boolean = false) => {
     if (!error) return '';
 
-    // 영어 에러 메시지를 한국어로 변환
+    // 서버 연결 관련 에러는 무시 (내부 네트워크 전용 모드)
+    const serverErrorPatterns = [
+      'network', 'fetch failed', 'timeout', 'server',
+      '서버 연결', '접근 거부', '네트워크 연결'
+    ];
+
+    const lowerError = error.toLowerCase();
+
+    // 로컬 인증 에러가 아니고 서버 관련 에러인 경우 빈 문자열 반환
+    if (!isLocalAuthError) {
+      for (const pattern of serverErrorPatterns) {
+        if (lowerError.includes(pattern)) {
+          console.log('[LoginPage] 서버 연결 에러 무시:', error);
+          return '';
+        }
+      }
+    }
+
+    // 영어 에러 메시지를 한국어로 변환 (로컬 인증 전용)
     const errorMappings: Record<string, string> = {
       'required': '필수 항목을 입력해주세요.',
       'invalid': '입력하신 정보가 올바르지 않습니다.',
-      'not found': '요청하신 정보를 찾을 수 없습니다.',
-      'unauthorized': '접근 권한이 없습니다.',
+      'not found': '이메일 또는 비밀번호가 일치하지 않습니다.',
+      'unauthorized': '이메일 또는 비밀번호가 일치하지 않습니다.',
       'forbidden': '이 작업을 수행할 권한이 없습니다.',
-      'network': '네트워크 연결을 확인해주세요.',
-      'fetch failed': '네트워크 연결을 확인해주세요.',
-      'timeout': '요청 시간이 초과되었습니다. 다시 시도해주세요.',
-      'server': '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
-      'database': '데이터베이스 오류가 발생했습니다.',
-      'authentication': '인증에 실패했습니다.',
+      'database': '로컬 데이터베이스 오류가 발생했습니다.',
+      'authentication': '이메일 또는 비밀번호가 일치하지 않습니다.',
       'validation': '입력 정보를 확인해주세요.',
-      'no handler registered': '필요한 기능이 아직 구현되지 않았습니다.',
-      'auth:offline-login': '오프라인 로그인 기능이 아직 구현되지 않았습니다.',
-      'auth:offline-register': '오프라인 회원가입 기능이 아직 구현되지 않았습니다.',
-      'auth:get-offline-users': '오프라인 사용자 목록 기능이 아직 구현되지 않았습니다.',
+      'no handler registered': '로그인 기능을 사용할 수 없습니다.',
+      'auth:offline-login': '로컬 로그인 기능을 사용할 수 없습니다.',
     };
 
     // 대소문자 구분 없이 매핑
-    const lowerError = error.toLowerCase();
     for (const [key, message] of Object.entries(errorMappings)) {
       if (lowerError.includes(key)) {
         return message;
       }
     }
 
-    // 매핑되지 않은 에러는 그대로 표시하되, 너무 긴 메시지는 줄임
-    if (error.length > 100) {
-      return '오류가 발생했습니다. 다시 시도해주세요.';
+    // 로컬 인증 에러만 표시
+    if (isLocalAuthError && error.length > 100) {
+      return '로그인에 실패했습니다. 이메일과 비밀번호를 확인해주세요.';
     }
 
-    return error;
+    return isLocalAuthError ? error : '';
   };
 
   // API 서버 연결 상태 확인 (외부 네트워크)
@@ -149,19 +160,16 @@ export default function LoginPage({ onSwitchToSignup }: LoginPageProps) {
     setConnectionChecked(true);
     setInternalNetworkConnected(internalAvailable);
     setExternalNetworkConnected(externalAvailable);
-    
-    // 외부 네트워크 연결 실패 시 알림
-    if (!externalAvailable && connectionChecked) {
-      console.warn('외부 네트워크에 연결할 수 없습니다. 사내 네트워크에서 메시징 기능을 사용하세요.');
-      // 알림은 메인 프로세스에서 처리
-      if (window.electronAPI?.showNotification) {
-        window.electronAPI.showNotification({
-          title: '네트워크 연결 알림',
-          body: '외부 네트워크에 연결할 수 없습니다. 사내 네트워크에서 메시징 기능을 사용하세요.'
-        });
-      }
-    }
-    
+
+    // 내부 네트워크 전용 모드: 외부 네트워크 연결 실패 알림 제거
+    // 조용히 로컬/내부 네트워크 모드로 동작
+    console.log('[LoginPage] 네트워크 상태:', {
+      networkStatus: currentNetworkStatus,
+      internal: internalAvailable,
+      external: externalAvailable,
+      api: apiAvailable
+    });
+
     return currentNetworkStatus !== 'offline';
   };
 
@@ -217,30 +225,21 @@ export default function LoginPage({ onSwitchToSignup }: LoginPageProps) {
     setError('');
     setIsLoading(true);
 
-    console.log('Login attempt:', { identifier, password: '***', isOnline, networkStatus });
+    console.log('[LoginPage] 로그인 시도 - 내부 네트워크 전용 모드:', { identifier, networkStatus });
 
     try {
       let result;
 
-      if (!isOnline) {
-        // 오프라인 모드: 로컬 SQLite DB 사용
-        console.log('Using offline authentication');
-        
-        // 데이터베이스 연결 상태 확인
-        const dbConnected = await checkDatabaseConnection();
-        if (!dbConnected) {
-          console.log('Database not connected, falling back to online mode');
-          setError('데이터베이스 연결에 실패했습니다. 온라인 모드로 시도합니다.');
-          // 온라인 모드로 전환
-          setIsOnline(true);
-        } else {
-          result = await window.electronAPI?.offlineLogin?.({
-            email: identifier,
-            password,
-          });
+      // 내부 네트워크 전용 모드: 서버 연결 시도 없이 바로 로컬 인증 사용
+      console.log('[LoginPage] 로컬 SQLite DB 인증 사용');
 
-          console.log('Offline login result:', result);
-        }
+      try {
+        result = await window.electronAPI?.offlineLogin?.({
+          email: identifier,
+          password,
+        });
+
+        console.log('[LoginPage] 로컬 인증 결과:', result);
 
         if (result?.success) {
           // 오프라인 사용자 정보를 온라인 형식으로 변환
@@ -252,44 +251,37 @@ export default function LoginPage({ onSwitchToSignup }: LoginPageProps) {
             role: offlineUser.role,
           };
 
+          console.log('[LoginPage] 로그인 성공:', onlineUser);
           setAuth(result.token, onlineUser);
           return;
-        }
-      } else {
-        // 온라인 모드: API 서버 사용
-        console.log('Using online authentication');
-        result = await window.electronAPI?.login?.({
-          identifier,
-          password,
-          rememberMe
-        });
-
-        console.log('Online login result:', result);
-      }
-
-      console.log('Login result:', result);
-
-      if (!result) {
-        setError('로그인 응답을 받지 못했습니다.');
-        return;
-      }
-
-      if (result.success && result.token && result.user) {
-        // Check if user is teacher or admin
-        const allowedRoles = ['TEACHER', 'ADMIN', 'SUPER_ADMIN'];
-        if (!result.user.role || !allowedRoles.includes(result.user.role)) {
-          setError('이 앱은 교사 및 관리자만 사용할 수 있습니다.');
-          await window.electronAPI?.logout?.();
+        } else if (result?.error) {
+          // 로컬 인증 실패 시에만 에러 표시
+          const localErrorMessage = getFriendlyErrorMessage(result.error, true);
+          if (localErrorMessage) {
+            setError(localErrorMessage);
+          } else {
+            setError('이메일 또는 비밀번호가 일치하지 않습니다.');
+          }
+          return;
+        } else {
+          setError('로그인에 실패했습니다. 다시 시도해주세요.');
           return;
         }
-
-        setAuth(result.token, result.user);
-      } else {
-        setError(getFriendlyErrorMessage(result.error) || '로그인에 실패했습니다.');
+      } catch (offlineError: any) {
+        console.error('[LoginPage] 로컬 인증 실패:', offlineError);
+        // 로컬 로그인 실패 시에만 에러 표시
+        const localErrorMessage = getFriendlyErrorMessage(offlineError.message || String(offlineError), true);
+        if (localErrorMessage) {
+          setError(localErrorMessage);
+        } else {
+          setError('로그인에 실패했습니다. 이메일과 비밀번호를 확인해주세요.');
+        }
+        return;
       }
     } catch (err: any) {
-      console.error('Login error:', err);
-      setError(getFriendlyErrorMessage(err.message) || '로그인 중 오류가 발생했습니다.');
+      console.error('[LoginPage] 로그인 에러:', err);
+      // 예상치 못한 에러 처리
+      setError('로그인 중 오류가 발생했습니다. 다시 시도해주세요.');
     } finally {
       setIsLoading(false);
     }

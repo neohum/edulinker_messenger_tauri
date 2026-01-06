@@ -1567,11 +1567,13 @@ fn window_close(app: AppHandle) -> Result<Value, String> {
   Ok(json!({"success": true}))
 }
 
-fn window_toggle_devtools(app: AppHandle) -> Result<Value, String> {
-  if let Some(window) = app.get_webview_window("main") {
-    window.open_devtools();
+fn window_toggle_devtools(_app: AppHandle) -> Result<Value, String> {
+  // DevTools feature is not enabled in production builds
+  #[cfg(all(debug_assertions, feature = "devtools"))]
+  if let Some(webview) = _app.get_webview_window("main") {
+    webview.open_devtools();
   }
-  Ok(json!({"success": true}))
+  Ok(json!({"success": true, "message": "DevTools not available in this build"}))
 }
 
 fn device_get_info(state: State<'_, AppState>) -> Result<Value, String> {

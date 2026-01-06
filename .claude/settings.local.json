@@ -27,7 +27,8 @@
       "WebSearch",
       "Bash(pnpm tauri signer generate:*)",
       "Bash(findstr:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(pnpm tauri build:*)"
     ]
   }
 }
